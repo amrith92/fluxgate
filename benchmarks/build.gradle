@@ -14,6 +14,6 @@ java {
 
 jmh {
     warmupIterations = 2
-    measurementIterations = 5
+    iterations = 5
     fork = 1
 }
