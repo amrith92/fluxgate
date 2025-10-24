@@ -36,7 +36,8 @@ public final class PolicyCompiler {
         List<LimitPolicy> policies = new ArrayList<>();
         for (Object element : iterable) {
             if (element instanceof Map<?, ?> policyMap) {
-                String id = String.valueOf(policyMap.getOrDefault("id", "anonymous"));
+                Object idNode = policyMap.get("id");
+                String id = idNode != null ? idNode.toString() : "anonymous";
                 double limit = toDouble(policyMap.get("limitPerSecond"), 100d);
                 double burst = toDouble(policyMap.get("burst"), limit);
                 long window = toLong(policyMap.get("windowSeconds"), 60L);

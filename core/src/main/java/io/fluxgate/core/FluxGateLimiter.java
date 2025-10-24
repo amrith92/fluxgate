@@ -53,7 +53,7 @@ public final class FluxGateLimiter {
         Objects.requireNonNull(policySupplier, "policySupplier");
         LimitPolicy policy = policySupplier.apply(keyHash);
         if (policy == null) {
-            return RateLimitOutcome.allowed();
+            return RateLimitOutcome.allow();
         }
 
         double scaledLimit = limitScaler.scale(policy.limitPerSecond(), estimator.instanceShare());
@@ -67,7 +67,7 @@ public final class FluxGateLimiter {
             sketch.increment(keyHash, nowNanos);
             heavyKeeper.offer(keyHash);
             rotator.rotateIfNeeded(nowNanos);
-            return RateLimitOutcome.allowed();
+            return RateLimitOutcome.allow();
         }
 
         metrics.recordBlocked();
@@ -92,7 +92,7 @@ public final class FluxGateLimiter {
     }
 
     public record RateLimitOutcome(boolean allowed, long retryAfterNanos) {
-        public static RateLimitOutcome allowed() {
+        public static RateLimitOutcome allow() {
             return new RateLimitOutcome(true, 0);
         }
 
