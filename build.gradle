@@ -89,6 +89,14 @@ project(':api') {
     dependencies {
         implementation project(':core')
         implementation 'org.slf4j:slf4j-api:2.0.12'
+        testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+        testImplementation 'org.assertj:assertj-core:3.25.3'
+    }
+}
+
+project(':adapters:resilience4j') {
+    dependencies {
+        implementation project(':core')
     }
 }
 

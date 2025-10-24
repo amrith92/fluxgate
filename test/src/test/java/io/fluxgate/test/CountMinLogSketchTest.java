@@ -10,12 +10,19 @@ public final class CountMinLogSketchTest {
 
     @Test
     void estimateIncreasesWithInserts() {
+        // Arrange
         CountMinLogSketch sketch = new CountMinLogSketch(4, 1024, Duration.ofSeconds(1));
         long key = 1234L;
-        assertThat(sketch.estimate(key)).isZero();
+
+        // Act
+        long before = sketch.estimate(key);
         for (int i = 0; i < 100; i++) {
             sketch.increment(key, i);
         }
-        assertThat(sketch.estimate(key)).isPositive();
+        long after = sketch.estimate(key);
+
+        // Assert
+        assertThat(before).isZero();
+        assertThat(after).isGreaterThan(before);
     }
 }

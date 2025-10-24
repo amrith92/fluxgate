@@ -17,6 +17,7 @@ public final class Resilience4jAdapter {
 
     private final FluxGateLimiter limiter;
     private final Function<Long, LimitPolicy> policyLookup;
+    private final ThreadLocal<CachedOutcome> cachedOutcome = new ThreadLocal<>();
 
     public Resilience4jAdapter(FluxGateLimiter limiter, Function<Long, LimitPolicy> policyLookup) {
         this.limiter = Objects.requireNonNull(limiter, "limiter");
@@ -24,15 +25,30 @@ public final class Resilience4jAdapter {
     }
 
     public boolean tryAcquire(long keyHash) {
-        RateLimitOutcome outcome = limiter.check(keyHash, policyLookup, System.nanoTime());
-        return outcome.allowed();
+        CachedOutcome outcome = evaluate(keyHash);
+        return outcome.outcome().allowed();
     }
 
     public Duration retryAfter(long keyHash) {
-        RateLimitOutcome outcome = limiter.check(keyHash, policyLookup, System.nanoTime());
-        if (outcome.allowed()) {
-            return Duration.ZERO;
+        CachedOutcome cached = cachedOutcome.get();
+        CachedOutcome outcome = cached != null && cached.keyHash() == keyHash ? cached : evaluate(keyHash);
+        try {
+            if (outcome.outcome().allowed()) {
+                return Duration.ZERO;
+            }
+            return Duration.ofNanos(outcome.outcome().retryAfterNanos());
+        } finally {
+            cachedOutcome.remove();
         }
-        return Duration.ofNanos(outcome.retryAfterNanos());
+    }
+
+    private CachedOutcome evaluate(long keyHash) {
+        RateLimitOutcome outcome = limiter.check(keyHash, policyLookup, System.nanoTime());
+        CachedOutcome cached = new CachedOutcome(keyHash, outcome);
+        cachedOutcome.set(cached);
+        return cached;
+    }
+
+    private record CachedOutcome(long keyHash, RateLimitOutcome outcome) {
     }
 }

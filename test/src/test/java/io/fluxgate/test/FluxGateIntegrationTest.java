@@ -10,6 +10,7 @@ public final class FluxGateIntegrationTest {
 
     @Test
     void simpleAllowAndBlock() {
+        // Arrange
         FluxGate limiter = FluxGate.builder().build();
         FluxGate.RequestContext ctx = new FluxGate.RequestContext() {
             @Override
@@ -22,7 +23,13 @@ public final class FluxGateIntegrationTest {
                 return "/";
             }
         };
-        RateLimitResult result = limiter.check(ctx);
-        assertThat(result.allowed()).isTrue();
+
+        // Act
+        RateLimitResult first = limiter.check(ctx);
+        RateLimitResult second = limiter.check(ctx);
+
+        // Assert
+        assertThat(first.allowed()).isTrue();
+        assertThat(second.allowed()).isFalse();
     }
 }
