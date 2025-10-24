@@ -1,4 +1,4 @@
-package io.fluxgate.core.resilience4j;
+package io.fluxgate.adapters.resilience4j;
 
 import io.fluxgate.core.FluxGateLimiter;
 import io.fluxgate.core.FluxGateLimiter.RateLimitOutcome;
@@ -8,6 +8,11 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.function.Function;
 
+/**
+ * Adapter that exposes a {@link FluxGateLimiter} through a Resilience4j-style contract.
+ * This module allows optional integrations to depend on FluxGate without forcing the
+ * core module to take a dependency on adapter concerns.
+ */
 public final class Resilience4jAdapter {
 
     private final FluxGateLimiter limiter;

@@ -1,6 +1,6 @@
-plugins {
-    id 'java'
-}
+import org.gradle.api.plugins.quality.Checkstyle
+import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
+import org.gradle.testing.jacoco.tasks.JacocoReport
 
 allprojects {
     group = 'io.fluxgate'
@@ -13,6 +13,8 @@ allprojects {
 
 subprojects {
     apply plugin: 'java'
+    apply plugin: 'jacoco'
+    apply plugin: 'checkstyle'
 
     java {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -21,6 +23,55 @@ subprojects {
 
     tasks.withType(Test).configureEach {
         useJUnitPlatform()
+        finalizedBy(tasks.named('jacocoTestReport'))
+    }
+
+    jacoco {
+        toolVersion = '0.8.11'
+    }
+
+    tasks.withType(JacocoReport).configureEach {
+        dependsOn(tasks.withType(Test))
+        reports {
+            xml.required = true
+            csv.required = false
+            html.required = true
+        }
+        onlyIf {
+            executionData.files.any { it.exists() }
+        }
+    }
+
+    tasks.withType(JacocoCoverageVerification).configureEach {
+        dependsOn(tasks.withType(Test))
+        violationRules {
+            rule {
+                limit {
+                    counter = 'LINE'
+                    value = 'COVEREDRATIO'
+                    minimum = 0.80
+                }
+            }
+        }
+        onlyIf {
+            executionData.files.any { it.exists() }
+        }
+    }
+
+    tasks.named('check').configure {
+        dependsOn(tasks.withType(JacocoCoverageVerification))
+    }
+
+    checkstyle {
+        toolVersion = '10.12.4'
+        configDirectory.set(file("$rootDir/config/checkstyle"))
+    }
+
+    tasks.withType(Checkstyle).configureEach {
+        reports {
+            xml.required = false
+            html.required = true
+        }
     }
 }
 
@@ -38,6 +89,12 @@ project(':api') {
     dependencies {
         implementation project(':core')
         implementation 'org.slf4j:slf4j-api:2.0.12'
+    }
+}
+
+project(':adapters:resilience4j') {
+    dependencies {
+        implementation project(':core')
     }
 }
 

@@ -11,7 +11,6 @@ import io.fluxgate.core.TierA.TinyLfuCache;
 import io.fluxgate.core.TierB.CountMinLogSketch;
 import io.fluxgate.core.TierB.HeavyKeeper;
 import io.fluxgate.core.TierB.SliceRotator;
-import io.fluxgate.core.resilience4j.Resilience4jAdapter;
 
 import java.time.Duration;
 import java.util.Collection;
@@ -90,10 +89,6 @@ public final class FluxGateLimiter {
 
     public FluxGateStats stats() {
         return stats;
-    }
-
-    public Resilience4jAdapter asResilience4jAdapter(Function<Long, LimitPolicy> policyLookup) {
-        return new Resilience4jAdapter(this, policyLookup);
     }
 
     public record RateLimitOutcome(boolean allowed, long retryAfterNanos) {
