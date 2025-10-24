@@ -100,6 +100,12 @@ project(':adapters:resilience4j') {
     }
 }
 
+project(':adapters:resilience4j') {
+    dependencies {
+        implementation project(':core')
+    }
+}
+
 project(':examples') {
     dependencies {
         implementation project(':api')

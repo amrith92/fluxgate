@@ -1,2 +1,3 @@
 rootProject.name = 'fluxgate'
+
 include 'core', 'api', 'adapters:resilience4j', 'examples', 'test', 'benchmarks'
