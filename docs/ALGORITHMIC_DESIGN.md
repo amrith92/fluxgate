@@ -4,7 +4,7 @@ FluxGate enforces rate limits through two cooperating tiers that balance precisi
 
 ## Tier A hot key control
 
-Tier A stores keys that receive a large share of traffic. Each shard keeps a segmented LRU cache that uses TinyLFU admission to identify entries worth tracking precisely. When a request arrives, the shard hashes the key, consults the admission sketch, and promotes it into the GCRA cache if the recent frequency crosses the configured threshold. Eviction favors cold entries while protecting frequently accessed keys.
+Tier A stores keys that receive a large share of traffic. Each shard keeps a segmented LRU cache backed by a hybrid admission policy that combines a TinyLFU-inspired frequency sketch with a probationary FIFO window. The first time a key arrives it enters the probation window. A follow-up hit or a sufficiently high sketch score promotes the key into the precise GCRA cache. This two-phase approach reacts quickly to bursts while still filtering one-hit traffic. Eviction samples a handful of candidates and removes the entry with the weakest combined frequency and recency score so that cold keys fall out promptly while hot keys remain protected.
 
 The Generalized Cell Rate Algorithm models traffic as a virtual departure schedule. Every key maintains a theoretical arrival time that advances by the token period. Requests succeed when the current time plus burst allowance exceeds the stored arrival time. FluxGate implements this logic with compare-and-set loops on padded atomic longs. Shards map directly to CPU cores so that no two threads contend for the same atomic variable. The limiter returns a retry hint that equals the difference between the scheduled time and the current moment when a request is rejected.
 
