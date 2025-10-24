@@ -9,11 +9,16 @@ public final class GcraLimiterTest {
 
     @Test
     void allowsBurstThenBlocks() {
+        // Arrange
         GcraLimiter limiter = new GcraLimiter(1_000_000_000L, 10, 10);
         long now = 0L;
+
+        // Act & Assert
         for (int i = 0; i < 10; i++) {
             assertThat(limiter.tryAcquire(now).allowed()).isTrue();
         }
+
+        // Assert
         assertThat(limiter.tryAcquire(now).allowed()).isFalse();
     }
 }
