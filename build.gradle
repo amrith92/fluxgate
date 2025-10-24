@@ -1,0 +1,58 @@
+plugins {
+    id 'java'
+}
+
+allprojects {
+    group = 'io.fluxgate'
+    version = '0.1.0'
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+    }
+}
+
+project(':core') {
+    dependencies {
+        implementation 'org.slf4j:slf4j-api:2.0.12'
+        implementation 'com.fasterxml.jackson.core:jackson-databind:2.16.1'
+        implementation 'org.yaml:snakeyaml:2.2'
+        testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+        testImplementation 'org.assertj:assertj-core:3.25.3'
+    }
+}
+
+project(':api') {
+    dependencies {
+        implementation project(':core')
+        implementation 'org.slf4j:slf4j-api:2.0.12'
+    }
+}
+
+project(':examples') {
+    dependencies {
+        implementation project(':api')
+        implementation 'com.sparkjava:spark-core:2.9.4'
+        implementation 'org.slf4j:slf4j-simple:2.0.12'
+    }
+}
+
+project(':test') {
+    dependencies {
+        testImplementation project(':api')
+        testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+        testImplementation 'org.assertj:assertj-core:3.25.3'
+    }
+}
