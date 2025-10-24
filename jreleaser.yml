@@ -1,0 +1,44 @@
+project:
+  name: fluxgate
+  version: "{{ env.JRELEASER_PROJECT_VERSION }}"
+  description: "Fluxgate configuration toolkit for building declarative API observability."
+  longDescription: |
+    Fluxgate provides core libraries and an API layer for configuring declarative
+    observability pipelines. Distributions published with this release contain the
+    compiled module JARs so they can be consumed directly from GitHub releases.
+  links:
+    homepage: "https://github.com/{{ env.GITHUB_REPOSITORY }}"
+    documentation: "https://github.com/{{ env.GITHUB_REPOSITORY }}#readme"
+  authors:
+    - Fluxgate Contributors
+  license: Apache-2.0
+  java:
+    groupId: io.fluxgate
+    version: 17
+
+release:
+  github:
+    owner: "{{ env.GITHUB_REPOSITORY_OWNER }}"
+    name: "{{projectName}}"
+    tagName: v{{projectVersion}}
+    releaseName: Fluxgate {{projectVersion}}
+    overwrite: true
+    draft: false
+    changelog:
+      formatted: ALWAYS
+      skipMergeCommits: true
+      preset: conventional-commits
+
+signing:
+  active: ALWAYS
+  armored: true
+
+files:
+  active: ALWAYS
+  artifacts:
+    - path: core/build/libs/core-{{projectVersion}}.jar
+      transform: fluxgate-core-{{projectVersion}}.jar
+    - path: api/build/libs/api-{{projectVersion}}.jar
+      transform: fluxgate-api-{{projectVersion}}.jar
+    - path: examples/build/libs/examples-{{projectVersion}}.jar
+      transform: fluxgate-examples-{{projectVersion}}.jar
