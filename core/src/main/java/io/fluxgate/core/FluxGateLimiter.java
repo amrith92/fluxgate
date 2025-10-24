@@ -7,7 +7,7 @@ import io.fluxgate.core.Observability.FluxGateStats;
 import io.fluxgate.core.Policy.LimitPolicy;
 import io.fluxgate.core.Policy.PolicyCompiler;
 import io.fluxgate.core.TierA.GcraLimiter;
-import io.fluxgate.core.TierA.TinyLfuCache;
+import io.fluxgate.core.TierA.HybridHotKeyCache;
 import io.fluxgate.core.TierB.CountMinLogSketch;
 import io.fluxgate.core.TierB.HeavyKeeper;
 import io.fluxgate.core.TierB.SliceRotator;
@@ -26,7 +26,7 @@ import java.util.function.Function;
  */
 public final class FluxGateLimiter {
 
-    private final TinyLfuCache<Long, GcraLimiter> hotCache;
+    private final HybridHotKeyCache<Long, GcraLimiter> hotCache;
     private final CountMinLogSketch sketch;
     private final HeavyKeeper heavyKeeper;
     private final FluxGateMetrics metrics;
@@ -37,7 +37,7 @@ public final class FluxGateLimiter {
     private final SliceRotator rotator;
 
     public FluxGateLimiter(Builder builder) {
-        this.hotCache = new TinyLfuCache<>(builder.shardCapacity);
+        this.hotCache = new HybridHotKeyCache<>(builder.shardCapacity);
         this.sketch = new CountMinLogSketch(builder.sketchDepth, builder.sketchWidth, builder.sliceWindow);
         this.heavyKeeper = new HeavyKeeper(builder.heavyKeeperCapacity, builder.heavyKeeperDecay);
         this.metrics = builder.metrics;
