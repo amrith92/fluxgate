@@ -20,7 +20,7 @@ final class PolicyCompilerTest {
                 .fromYaml(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
 
         // Assert
-        assertThat(policies).hasSize(1);
-        assertThat(policies.get(0).id()).isEqualTo("ip-global");
+        assertThat(policies.policies()).hasSize(1);
+        assertThat(policies.policies().get(0).id()).isEqualTo("ip-global");
     }
 }

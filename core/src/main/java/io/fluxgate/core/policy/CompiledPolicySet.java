@@ -9,16 +9,10 @@ import java.util.Optional;
  * Immutable container for compiled policies. Provides evaluation helpers that walk the
  * matcher graph and produce per-policy decisions without additional allocation.
  */
-public final class CompiledPolicySet {
+public record CompiledPolicySet(List<LimitPolicy> policies) {
 
-    private final List<LimitPolicy> policies;
-
-    public CompiledPolicySet(Collection<LimitPolicy> policies) {
-        this.policies = List.copyOf(policies);
-    }
-
-    public List<LimitPolicy> policies() {
-        return policies;
+    public CompiledPolicySet {
+        policies = List.copyOf(policies);
     }
 
     public List<PolicyDecision> evaluate(PolicyContext context) {
@@ -40,6 +34,6 @@ public final class CompiledPolicySet {
     }
 
     public static CompiledPolicySet of(Collection<LimitPolicy> policies) {
-        return new CompiledPolicySet(policies);
+        return new CompiledPolicySet(List.copyOf(policies));
     }
 }

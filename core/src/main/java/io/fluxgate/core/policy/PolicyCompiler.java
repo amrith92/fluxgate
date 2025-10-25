@@ -5,12 +5,7 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public final class PolicyCompiler {
 
@@ -42,10 +37,6 @@ public final class PolicyCompiler {
                 policies.add(parsePolicy(policyMap));
             }
         }
-        return new CompiledPolicySet(policies);
-    }
-
-    public static CompiledPolicySet of(Collection<LimitPolicy> policies) {
         return new CompiledPolicySet(policies);
     }
 
