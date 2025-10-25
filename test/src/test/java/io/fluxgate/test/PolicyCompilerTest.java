@@ -1,14 +1,14 @@
 package io.fluxgate.test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import io.fluxgate.core.policy.PolicyCompiler;
+import org.junit.jupiter.api.Test;
+
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
-public final class PolicyCompilerTest {
+final class PolicyCompilerTest {
 
     @Test
     void parsesYaml() {

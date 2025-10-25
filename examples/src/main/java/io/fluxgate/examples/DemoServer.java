@@ -2,7 +2,6 @@ package io.fluxgate.examples;
 
 import io.fluxgate.api.FluxGate;
 import io.fluxgate.api.RateLimitResult;
-
 import spark.Service;
 
 public final class DemoServer {

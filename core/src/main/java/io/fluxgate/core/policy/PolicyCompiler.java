@@ -49,7 +49,7 @@ public final class PolicyCompiler {
     }
 
     public static List<LimitPolicy> defaults() {
-        return List.of(new LimitPolicy("default", 1000d, 1000d, 60));
+        return List.of(new LimitPolicy("default", 1d, 1d, 60));
     }
 
     private static double toDouble(Object value, double defaultValue) {
