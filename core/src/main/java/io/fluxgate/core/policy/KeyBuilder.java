@@ -24,6 +24,13 @@ public final class KeyBuilder {
         return this;
     }
 
+    public KeyBuilder attributes(Map<String, String> attributes) {
+        if (attributes != null) {
+            attributes.forEach(this::attribute);
+        }
+        return this;
+    }
+
     public KeyBuilder ip(String ip) {
         return attribute("ip", ip);
     }

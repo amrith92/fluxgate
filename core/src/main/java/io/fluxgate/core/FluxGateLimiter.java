@@ -4,6 +4,7 @@ import io.fluxgate.core.adaptive.EwmaTrafficEstimator;
 import io.fluxgate.core.adaptive.LimitScaler;
 import io.fluxgate.core.observability.FluxGateMetrics;
 import io.fluxgate.core.observability.FluxGateStats;
+import io.fluxgate.core.policy.CompiledPolicySet;
 import io.fluxgate.core.policy.LimitPolicy;
 import io.fluxgate.core.policy.PolicyCompiler;
 import io.fluxgate.core.tierA.GcraLimiter;
@@ -117,7 +118,7 @@ public final class FluxGateLimiter {
         private FluxGateStats stats = new FluxGateStats();
         private EwmaTrafficEstimator estimator = new EwmaTrafficEstimator();
         private LimitScaler limitScaler = new LimitScaler();
-        private Collection<LimitPolicy> policies = PolicyCompiler.defaults();
+        private Collection<LimitPolicy> policies = PolicyCompiler.defaults().policies();
 
         public Builder withShardCapacity(int shardCapacity) {
             this.shardCapacity = shardCapacity;
@@ -142,6 +143,11 @@ public final class FluxGateLimiter {
 
         public Builder withPolicies(Collection<LimitPolicy> policies) {
             this.policies = policies;
+            return this;
+        }
+
+        public Builder withPolicySet(CompiledPolicySet policySet) {
+            this.policies = policySet.policies();
             return this;
         }
 
