@@ -100,19 +100,6 @@ adaptive convergence) require collecting and post-processing different outputs:
 - Adaptive convergence: run multiple independent seeds (set `-p seed=...`), collect the
   adaptive state or final promoted counts, and compute variance across instances.
 
-Recommended follow-ups (I can implement any of these):
-
-1. Expose a minimal read-only API on `FluxGateLimiter` to query `isHot(keyHash)` and
-   `sketchEstimate(keyHash)`. This will let the benchmark compute promotion precision and
-   tier-B error directly in `collectStats()`.
-
-2. Add a `--enable-verify` runner script that runs the jmh jar multiple times with
-   different seeds and writes a CSV with the metrics for each run (p99, ops/s, mem, precision,
-   tier-B error) so you can compute convergence and variance.
-
-3. Add a small `benchmarks/analysis` helper (Java or Python) to parse JMH JSON output and
-   compute percentiles, aggregate metrics and produce human-readable CSV suitable for plotting.
-
 Notes
 -----
 - `verify=true` changes the execution profile (adds synchronization and maps) so use it only
@@ -120,14 +107,4 @@ Notes
 - For sub-microsecond p99 numbers you must run on isolated, dedicated hardware and tune the
   JMH options (`-wi`, `-i`, `-f`, `-t`) and JVM flags. Use `-XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints`
   to get more consistent stack traces/profiling if required.
-
-Contact
--------
-If you'd like I can:
-
-- Implement `FluxGateLimiter.isHot()` and `sketchEstimate()` and then extend `collectStats()` to
-  compute promotion precision and tier-B error automatically when `verify=true`.
-- Add a `benchmarks/run-verify.sh` driver to sweep seeds and produce a CSV with results.
-
-Tell me which of those follow-ups to implement next and I'll proceed.
 
