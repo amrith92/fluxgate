@@ -27,7 +27,11 @@ public final class HybridHotKeyCache<K, V> {
             throw new IllegalArgumentException("capacity must be positive");
         }
         this.capacity = capacity;
-        this.probationCapacity = Math.max(1, capacity / 8);
+        int probationTarget = Math.max(2, capacity / 8);
+        if (probationTarget >= capacity) {
+            probationTarget = Math.max(0, capacity - 1);
+        }
+        this.probationCapacity = Math.max(1, probationTarget);
         this.mainCapacity = Math.max(1, capacity - probationCapacity);
         this.mainCache = new LinkedHashMap<>(capacity, 0.75f, true);
         this.probationQueue = new LinkedHashMap<>(probationCapacity, 0.75f, false) {
@@ -54,7 +58,10 @@ public final class HybridHotKeyCache<K, V> {
         CacheEntry<V> probationEntry = probationQueue.remove(key);
         if (probationEntry != null) {
             probationEntry.touch(now);
-            admit(key, probationEntry, now);
+            considerAdmission(key, probationEntry, now);
+            if (!mainCache.containsKey(key)) {
+                probationQueue.put(key, probationEntry);
+            }
             return probationEntry.value;
         }
 
@@ -65,12 +72,17 @@ public final class HybridHotKeyCache<K, V> {
     }
 
     private void considerAdmission(K key, CacheEntry<V> entry, long now) {
-        Map.Entry<K, CacheEntry<V>> victim = selectVictim(now);
-        if (victim == null) {
-            if (frequencySketch.estimate(key) > 1) {
+        boolean hasHistory = entry.admissionTick < now;
+        if (mainCache.size() < mainCapacity) {
+            if (hasHistory || frequencySketch.estimate(key) > 1) {
                 probationQueue.remove(key);
                 admit(key, entry, now);
             }
+            return;
+        }
+
+        Map.Entry<K, CacheEntry<V>> victim = selectVictim(now);
+        if (victim == null) {
             return;
         }
 
@@ -128,7 +140,7 @@ public final class HybridHotKeyCache<K, V> {
         int freq = frequencySketch.estimate(key);
         long recencyPenalty = now - entry.lastAccessTick;
         long residencyPenalty = now - entry.admissionTick;
-        return (long) freq * 100L - recencyPenalty - residencyPenalty;
+        return freq * 100L - recencyPenalty - residencyPenalty;
     }
 
     public synchronized boolean isHot(K key) {

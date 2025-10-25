@@ -56,7 +56,7 @@ class HybridHotKeyCacheTest {
 
     @Test
     void frequentKeyDisplacesStaleEntry() {
-        HybridHotKeyCache<Integer, String> cache = new HybridHotKeyCache<>(8);
+        HybridHotKeyCache<Integer, String> cache = new HybridHotKeyCache<>(6);
 
         cache.getOrCompute(1, () -> "one");
         cache.getOrCompute(1, () -> {
@@ -70,12 +70,27 @@ class HybridHotKeyCacheTest {
         cache.getOrCompute(3, () -> {
             throw new AssertionError("cached");
         });
+        cache.getOrCompute(4, () -> "four");
+        cache.getOrCompute(4, () -> {
+            throw new AssertionError("cached");
+        });
 
         assertThat(cache.isHot(1)).isTrue();
         assertThat(cache.isHot(2)).isTrue();
         assertThat(cache.isHot(3)).isTrue();
+        assertThat(cache.isHot(4)).isTrue();
 
-        // Make key 1 stale by not touching it and hammer a new key.
+        cache.getOrCompute(2, () -> {
+            throw new AssertionError("cached");
+        });
+        cache.getOrCompute(3, () -> {
+            throw new AssertionError("cached");
+        });
+        cache.getOrCompute(4, () -> {
+            throw new AssertionError("cached");
+        });
+
+        // Make key 1 stale by not touching it and hammer a new key until it promotes.
         for (int i = 0; i < 10; i++) {
             cache.getOrCompute(99, () -> "ninety-nine");
         }
