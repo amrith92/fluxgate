@@ -16,7 +16,8 @@ public final class PolicyCompilerTest {
         String yaml = "policies:\n  - id: ip-global\n    limitPerSecond: 10\n    burst: 5\n    windowSeconds: 60\n";
 
         // Act
-        var policies = PolicyCompiler.fromYaml(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+        var policies = PolicyCompiler
+                .fromYaml(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
 
         // Assert
         assertThat(policies).hasSize(1);

@@ -1,5 +1,7 @@
 package io.fluxgate.core.policy;
 
+import org.yaml.snakeyaml.Yaml;
+
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -8,11 +10,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import org.yaml.snakeyaml.Yaml;
-
 public final class PolicyCompiler {
 
-    private PolicyCompiler() {}
+    private PolicyCompiler() {
+        throw new IllegalStateException("Cannot instantitate " + this.getClass());
+    }
 
     public static List<LimitPolicy> fromYaml(Path path) {
         try (InputStream in = Files.newInputStream(path)) {
@@ -22,7 +24,6 @@ public final class PolicyCompiler {
         }
     }
 
-    @SuppressWarnings("unchecked")
     public static List<LimitPolicy> fromYaml(InputStream in) {
         Yaml yaml = new Yaml();
         Object root = yaml.load(in);

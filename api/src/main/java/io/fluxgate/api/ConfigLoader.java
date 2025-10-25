@@ -9,7 +9,9 @@ import java.util.Collection;
 
 public final class ConfigLoader {
 
-    private ConfigLoader() {}
+    private ConfigLoader() {
+        throw new IllegalStateException("Cannot instantiate " + getClass());
+    }
 
     public static Collection<LimitPolicy> load(Path path) {
         return PolicyCompiler.fromYaml(path);

@@ -1,9 +1,10 @@
 package io.fluxgate.core.tierA;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class TinyLfuCacheTest {
 
@@ -14,8 +15,8 @@ class TinyLfuCacheTest {
         AtomicInteger creations = new AtomicInteger();
 
         // Act
-        Integer first = cache.getOrCompute("a", () -> creations.incrementAndGet());
-        Integer second = cache.getOrCompute("a", () -> creations.incrementAndGet());
+        Integer first = cache.getOrCompute("a", creations::incrementAndGet);
+        Integer second = cache.getOrCompute("a", creations::incrementAndGet);
 
         // Assert
         assertThat(first).isEqualTo(1);
@@ -31,11 +32,11 @@ class TinyLfuCacheTest {
         AtomicInteger bCreations = new AtomicInteger();
 
         // Act
-        cache.getOrCompute("a", () -> aCreations.incrementAndGet());
-        cache.getOrCompute("b", () -> bCreations.incrementAndGet());
-        cache.getOrCompute("a", () -> aCreations.incrementAndGet());
+        cache.getOrCompute("a", aCreations::incrementAndGet);
+        cache.getOrCompute("b", bCreations::incrementAndGet);
+        cache.getOrCompute("a", aCreations::incrementAndGet);
         cache.getOrCompute("c", () -> 3);
-        cache.getOrCompute("b", () -> bCreations.incrementAndGet());
+        cache.getOrCompute("b", bCreations::incrementAndGet);
 
         // Assert
         assertThat(aCreations.get()).isEqualTo(1);

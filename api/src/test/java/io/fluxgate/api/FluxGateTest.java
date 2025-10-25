@@ -1,10 +1,11 @@
 package io.fluxgate.api;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import io.fluxgate.core.policy.LimitPolicy;
-import java.util.List;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class FluxGateTest {
 
@@ -43,5 +44,6 @@ class FluxGateTest {
         assertThat(blocked.retryAfter().duration().isZero()).isFalse();
     }
 
-    private record SimpleContext(String ip, String route) implements FluxGate.RequestContext {}
+    private record SimpleContext(String ip, String route) implements FluxGate.RequestContext {
+    }
 }

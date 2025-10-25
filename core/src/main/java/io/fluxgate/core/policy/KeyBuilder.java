@@ -9,7 +9,9 @@ public final class KeyBuilder {
 
     private final Map<String, String> attributes = new LinkedHashMap<>();
 
-    private KeyBuilder() {}
+    private KeyBuilder() {
+        // no-op
+    }
 
     public static KeyBuilder of() {
         return new KeyBuilder();

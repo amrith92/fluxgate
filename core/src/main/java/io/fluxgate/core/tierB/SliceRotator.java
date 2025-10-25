@@ -9,12 +9,13 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class SliceRotator {
 
     private final CountMinLogSketch sketch;
-    private final Duration rotationPeriod;
+    private final long rotationPeriodNanos;
     private final AtomicLong nextRotation = new AtomicLong();
 
     public SliceRotator(CountMinLogSketch sketch, Duration rotationPeriod) {
         this.sketch = sketch;
-        this.rotationPeriod = rotationPeriod;
+        this.rotationPeriodNanos = rotationPeriod.toNanos();
+        this.nextRotation.set(this.rotationPeriodNanos);
     }
 
     public void rotateIfNeeded(long nowNanos) {
@@ -22,7 +23,7 @@ public final class SliceRotator {
         if (nowNanos < threshold) {
             return;
         }
-        long next = nowNanos + rotationPeriod.toNanos();
+        long next = nowNanos + rotationPeriodNanos;
         if (nextRotation.compareAndSet(threshold, next)) {
             sketch.reset();
         }

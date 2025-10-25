@@ -1,15 +1,16 @@
 package io.fluxgate.core;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import io.fluxgate.core.adaptive.EwmaTrafficEstimator;
 import io.fluxgate.core.adaptive.LimitScaler;
 import io.fluxgate.core.observability.FluxGateMetrics;
 import io.fluxgate.core.observability.FluxGateStats;
 import io.fluxgate.core.policy.LimitPolicy;
+import org.junit.jupiter.api.Test;
+
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class FluxGateLimiterTest {
 

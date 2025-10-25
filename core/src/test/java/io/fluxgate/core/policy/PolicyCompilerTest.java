@@ -1,11 +1,12 @@
 package io.fluxgate.core.policy;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class PolicyCompilerTest {
 
@@ -15,7 +16,8 @@ class PolicyCompilerTest {
         String yaml = "policies:\n  - id: a\n    limitPerSecond: 10\n    burst: 5\n    windowSeconds: 30\n";
 
         // Act
-        List<LimitPolicy> policies = PolicyCompiler.fromYaml(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+        List<LimitPolicy> policies = PolicyCompiler
+                .fromYaml(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
 
         // Assert
         assertThat(policies).hasSize(1);

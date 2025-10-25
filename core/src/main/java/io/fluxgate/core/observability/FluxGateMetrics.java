@@ -9,10 +9,14 @@ public interface FluxGateMetrics {
     static FluxGateMetrics noop() {
         return new FluxGateMetrics() {
             @Override
-            public void recordAllowed() {}
+            public void recordAllowed() {
+                // do nothing
+            }
 
             @Override
-            public void recordBlocked() {}
+            public void recordBlocked() {
+                // do nothing
+            }
         };
     }
 }
