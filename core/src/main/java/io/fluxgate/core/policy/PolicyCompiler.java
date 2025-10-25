@@ -156,7 +156,7 @@ public final class PolicyCompiler {
     }
 
     private static PolicyMatcher ipMatcher(Object node) {
-        RadixTrie trie = new RadixTrie();
+        PatriciaTrie trie = new PatriciaTrie();
         if (node instanceof Iterable<?> iterable) {
             for (Object element : iterable) {
                 trie.insert(element.toString());
@@ -164,6 +164,7 @@ public final class PolicyCompiler {
         } else {
             trie.insert(node.toString());
         }
+        trie.freeze();
         return context -> trie.matches(context.ip());
     }
 
