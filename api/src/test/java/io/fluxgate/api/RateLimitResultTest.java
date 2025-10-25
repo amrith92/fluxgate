@@ -1,9 +1,10 @@
 package io.fluxgate.api;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
-import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class RateLimitResultTest {
 
@@ -14,7 +15,7 @@ class RateLimitResultTest {
         RateLimitResult result = RateLimitResult.allowed();
 
         // Assert
-        assertThat(result.allowed()).isTrue();
+        assertThat(result.isAllowed()).isTrue();
         assertThat(result.retryAfter()).isEqualTo(RetryAfter.zero());
     }
 
@@ -27,7 +28,7 @@ class RateLimitResultTest {
         RateLimitResult result = RateLimitResult.blocked(retryAfter);
 
         // Assert
-        assertThat(result.allowed()).isFalse();
+        assertThat(result.isAllowed()).isFalse();
         assertThat(result.retryAfter()).isEqualTo(retryAfter);
         assertThat(result.retryAfter().seconds()).isEqualTo(5L);
     }

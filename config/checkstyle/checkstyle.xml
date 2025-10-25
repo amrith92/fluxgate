@@ -5,18 +5,19 @@
 <module name="Checker">
     <property name="severity" value="error"/>
 
+    <module name="LineLength">
+        <property name="max" value="120"/>
+        <property name="ignorePattern" value="^package|^import"/>
+    </module>
+
     <module name="TreeWalker">
-        <module name="ImportOrder">
-            <property name="option" value="top"/>
-            <property name="groups" value="java,javax,org,com"/>
-            <property name="ordered" value="true"/>
-            <property name="separated" value="true"/>
+        <module name="CustomImportOrder">
+            <property name="customImportOrderRules" value="THIRD_PARTY_PACKAGE###SPECIAL_IMPORTS###STANDARD_JAVA_PACKAGE###STATIC"/>
+            <property name="sortImportsInGroupAlphabetically" value="true"/>
+            <property name="standardPackageRegExp" value="^(java|javax)\."/>
+            <property name="separateLineBetweenGroups" value="true"/>
         </module>
         <module name="UnusedImports"/>
-        <module name="LineLength">
-            <property name="max" value="120"/>
-            <property name="ignorePattern" value="^package|^import"/>
-        </module>
         <module name="MethodParamPad"/>
         <module name="WhitespaceAround"/>
         <module name="WhitespaceAfter"/>

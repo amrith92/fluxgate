@@ -2,7 +2,6 @@ package io.fluxgate.examples;
 
 import io.fluxgate.api.FluxGate;
 import io.fluxgate.api.RateLimitResult;
-
 import spark.Service;
 
 public final class DemoServer {
@@ -22,7 +21,7 @@ public final class DemoServer {
                     return request.pathInfo();
                 }
             });
-            if (!result.allowed()) {
+            if (!result.isAllowed()) {
                 response.status(429);
                 response.header("Retry-After", String.valueOf(result.retryAfter().seconds()));
                 halt(429, "Too many requests\n");

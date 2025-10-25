@@ -1,12 +1,13 @@
 package io.fluxgate.test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import io.fluxgate.core.TierB.CountMinLogSketch;
-import java.time.Duration;
+import io.fluxgate.core.tierB.CountMinLogSketch;
 import org.junit.jupiter.api.Test;
 
-public final class CountMinLogSketchTest {
+import java.time.Duration;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+final class CountMinLogSketchTest {
 
     @Test
     void estimateIncreasesWithInserts() {

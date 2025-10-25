@@ -1,15 +1,14 @@
 package io.fluxgate.api;
 
 import io.fluxgate.core.FluxGateLimiter;
-import io.fluxgate.core.Policy.KeyBuilder;
-import io.fluxgate.core.Policy.LimitPolicy;
-import io.fluxgate.core.Policy.PolicyCompiler;
+import io.fluxgate.core.policy.KeyBuilder;
+import io.fluxgate.core.policy.LimitPolicy;
+import io.fluxgate.core.policy.PolicyCompiler;
 
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -31,7 +30,9 @@ public final class FluxGate {
                 policies = PolicyCompiler.defaults();
             }
         }
-        this.policyLookup = key -> policies.stream().findFirst().orElse(null);
+
+        final var finalPolicies = policies;
+        this.policyLookup = key -> finalPolicies.stream().findFirst().orElse(null);
         this.limiter = FluxGateLimiter.builder()
                 .withPolicies(policies)
                 .withShardCapacity(builder.shardCapacity)

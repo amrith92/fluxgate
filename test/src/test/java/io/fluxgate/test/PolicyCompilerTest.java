@@ -1,14 +1,14 @@
 package io.fluxgate.test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import io.fluxgate.core.Policy.PolicyCompiler;
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
+import io.fluxgate.core.policy.PolicyCompiler;
 import org.junit.jupiter.api.Test;
 
-public final class PolicyCompilerTest {
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+final class PolicyCompilerTest {
 
     @Test
     void parsesYaml() {
@@ -16,7 +16,8 @@ public final class PolicyCompilerTest {
         String yaml = "policies:\n  - id: ip-global\n    limitPerSecond: 10\n    burst: 5\n    windowSeconds: 60\n";
 
         // Act
-        var policies = PolicyCompiler.fromYaml(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+        var policies = PolicyCompiler
+                .fromYaml(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
 
         // Assert
         assertThat(policies).hasSize(1);

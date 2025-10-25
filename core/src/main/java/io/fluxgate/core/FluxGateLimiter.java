@@ -1,16 +1,16 @@
 package io.fluxgate.core;
 
-import io.fluxgate.core.Adaptive.EwmaTrafficEstimator;
-import io.fluxgate.core.Adaptive.LimitScaler;
-import io.fluxgate.core.Observability.FluxGateMetrics;
-import io.fluxgate.core.Observability.FluxGateStats;
-import io.fluxgate.core.Policy.LimitPolicy;
-import io.fluxgate.core.Policy.PolicyCompiler;
-import io.fluxgate.core.TierA.GcraLimiter;
-import io.fluxgate.core.TierA.HybridHotKeyCache;
-import io.fluxgate.core.TierB.CountMinLogSketch;
-import io.fluxgate.core.TierB.HeavyKeeper;
-import io.fluxgate.core.TierB.SliceRotator;
+import io.fluxgate.core.adaptive.EwmaTrafficEstimator;
+import io.fluxgate.core.adaptive.LimitScaler;
+import io.fluxgate.core.observability.FluxGateMetrics;
+import io.fluxgate.core.observability.FluxGateStats;
+import io.fluxgate.core.policy.LimitPolicy;
+import io.fluxgate.core.policy.PolicyCompiler;
+import io.fluxgate.core.tierA.GcraLimiter;
+import io.fluxgate.core.tierA.HybridHotKeyCache;
+import io.fluxgate.core.tierB.CountMinLogSketch;
+import io.fluxgate.core.tierB.HeavyKeeper;
+import io.fluxgate.core.tierB.SliceRotator;
 
 import java.time.Duration;
 import java.util.Collection;
@@ -53,7 +53,7 @@ public final class FluxGateLimiter {
         Objects.requireNonNull(policySupplier, "policySupplier");
         LimitPolicy policy = policySupplier.apply(keyHash);
         if (policy == null) {
-            return RateLimitOutcome.allowed();
+            return RateLimitOutcome.allow();
         }
 
         double scaledLimit = limitScaler.scale(policy.limitPerSecond(), estimator.instanceShare());
@@ -67,7 +67,7 @@ public final class FluxGateLimiter {
             sketch.increment(keyHash, nowNanos);
             heavyKeeper.offer(keyHash);
             rotator.rotateIfNeeded(nowNanos);
-            return RateLimitOutcome.allowed();
+            return RateLimitOutcome.allow();
         }
 
         metrics.recordBlocked();
@@ -92,7 +92,7 @@ public final class FluxGateLimiter {
     }
 
     public record RateLimitOutcome(boolean allowed, long retryAfterNanos) {
-        public static RateLimitOutcome allowed() {
+        public static RateLimitOutcome allow() {
             return new RateLimitOutcome(true, 0);
         }
 

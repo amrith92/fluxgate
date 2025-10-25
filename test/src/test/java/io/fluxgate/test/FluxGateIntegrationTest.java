@@ -1,12 +1,12 @@
 package io.fluxgate.test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import io.fluxgate.api.FluxGate;
 import io.fluxgate.api.RateLimitResult;
 import org.junit.jupiter.api.Test;
 
-public final class FluxGateIntegrationTest {
+import static org.assertj.core.api.Assertions.assertThat;
+
+final class FluxGateIntegrationTest {
 
     @Test
     void simpleAllowAndBlock() {
@@ -29,7 +29,7 @@ public final class FluxGateIntegrationTest {
         RateLimitResult second = limiter.check(ctx);
 
         // Assert
-        assertThat(first.allowed()).isTrue();
-        assertThat(second.allowed()).isFalse();
+        assertThat(first.isAllowed()).isTrue();
+        assertThat(second.isAllowed()).isFalse();
     }
 }

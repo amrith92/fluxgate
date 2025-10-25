@@ -1,16 +1,13 @@
 package io.fluxgate.benchmarks;
 
 import io.fluxgate.core.FluxGateLimiter;
-import io.fluxgate.core.Observability.FluxGateMetrics;
-import io.fluxgate.core.Observability.FluxGateStats;
-import io.fluxgate.core.Policy.LimitPolicy;
-import java.time.Duration;
-import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.Level;
-import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.Setup;
-import org.openjdk.jmh.annotations.State;
+import io.fluxgate.core.observability.FluxGateMetrics;
+import io.fluxgate.core.observability.FluxGateStats;
+import io.fluxgate.core.policy.LimitPolicy;
+import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
+
+import java.time.Duration;
 
 @State(Scope.Benchmark)
 public class FluxGateLimiterBenchmark {

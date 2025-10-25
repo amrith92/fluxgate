@@ -1,13 +1,10 @@
 package io.fluxgate.benchmarks;
 
-import io.fluxgate.core.TierA.TinyLfuCache;
-import java.util.concurrent.ThreadLocalRandom;
-import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.Level;
-import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.Setup;
-import org.openjdk.jmh.annotations.State;
+import io.fluxgate.core.tierA.TinyLfuCache;
+import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
+
+import java.util.concurrent.ThreadLocalRandom;
 
 @State(Scope.Benchmark)
 public class TinyLfuCacheBenchmark {
