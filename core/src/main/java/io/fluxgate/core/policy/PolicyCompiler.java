@@ -54,7 +54,7 @@ public final class PolicyCompiler {
         return new LimitPolicy(id, limit, burst, window, matcher);
     }
 
-    private static PolicyMatcher parseMatcher(Object node) {
+    static PolicyMatcher parseMatcher(Object node) {
         if (node == null) {
             return PolicyMatcher.always();
         }
@@ -86,7 +86,7 @@ public final class PolicyCompiler {
         throw new IllegalArgumentException("Unsupported matcher node: " + node);
     }
 
-    private static PolicyMatcher aggregate(List<PolicyMatcher> matchers) {
+    static PolicyMatcher aggregate(List<PolicyMatcher> matchers) {
         if (matchers.isEmpty()) {
             return PolicyMatcher.always();
         }
@@ -103,7 +103,7 @@ public final class PolicyCompiler {
         };
     }
 
-    private static PolicyMatcher allMatcher(Object node) {
+    static PolicyMatcher allMatcher(Object node) {
         List<PolicyMatcher> matchers = new ArrayList<>();
         if (node instanceof Iterable<?> iterable) {
             for (Object element : iterable) {
@@ -122,7 +122,7 @@ public final class PolicyCompiler {
         };
     }
 
-    private static PolicyMatcher anyMatcher(Object node) {
+    static PolicyMatcher anyMatcher(Object node) {
         List<PolicyMatcher> matchers = new ArrayList<>();
         if (node instanceof Iterable<?> iterable) {
             for (Object element : iterable) {
@@ -141,12 +141,12 @@ public final class PolicyCompiler {
         };
     }
 
-    private static PolicyMatcher notMatcher(Object node) {
+    static PolicyMatcher notMatcher(Object node) {
         PolicyMatcher matcher = parseMatcher(node);
         return context -> !matcher.matches(context);
     }
 
-    private static PolicyMatcher ipMatcher(Object node) {
+    static PolicyMatcher ipMatcher(Object node) {
         PatriciaTrie trie = new PatriciaTrie();
         if (node instanceof Iterable<?> iterable) {
             for (Object element : iterable) {
@@ -159,7 +159,7 @@ public final class PolicyCompiler {
         return context -> trie.matches(context.ip());
     }
 
-    private static PolicyMatcher routeMatcher(Object node) {
+    static PolicyMatcher routeMatcher(Object node) {
         RouteTrie trie = new RouteTrie();
         if (node instanceof Iterable<?> iterable) {
             for (Object element : iterable) {
@@ -171,7 +171,7 @@ public final class PolicyCompiler {
         return context -> trie.matches(context.route());
     }
 
-    private static PolicyMatcher attributesMatcher(Object node) {
+    static PolicyMatcher attributesMatcher(Object node) {
         if (!(node instanceof Map<?, ?> map)) {
             throw new IllegalArgumentException("attributes matcher expects map");
         }
@@ -183,7 +183,7 @@ public final class PolicyCompiler {
         return aggregate(matchers);
     }
 
-    private static PolicyMatcher singleAttributeMatcher(Object node) {
+    static PolicyMatcher singleAttributeMatcher(Object node) {
         if (!(node instanceof Map<?, ?> map)) {
             throw new IllegalArgumentException("attribute matcher expects map");
         }
@@ -206,7 +206,7 @@ public final class PolicyCompiler {
         return attributeMatcher(attribute, valueConfig);
     }
 
-    private static PolicyMatcher attributeMatcher(String name, Object config) {
+    static PolicyMatcher attributeMatcher(String name, Object config) {
         if (config instanceof Map<?, ?> map) {
             Object equals = map.get("equals");
             Object anyOf = map.get("anyOf");
@@ -244,7 +244,7 @@ public final class PolicyCompiler {
         };
     }
 
-    private static List<String> collectStrings(Object node) {
+    static List<String> collectStrings(Object node) {
         if (node == null) {
             return List.of();
         }

@@ -52,12 +52,5 @@ public final class GcraLimiter {
     }
 
     public record Outcome(boolean allowed, long retryAfterNanos) {
-        public boolean allowed() {
-            return allowed;
-        }
-
-        public long retryAfterNanos() {
-            return retryAfterNanos;
-        }
     }
 }

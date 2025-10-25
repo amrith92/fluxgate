@@ -15,7 +15,7 @@ final class RouteTrie {
     void insert(String pattern) {
         String normalized = normalize(pattern);
         String[] segments = normalized.isEmpty() ? new String[0] : normalized.split("/");
-        Node node = root;
+        var node = root;
         for (String segment : segments) {
             if (segment.equals("**")) {
                 node.multiWildcard = true;
