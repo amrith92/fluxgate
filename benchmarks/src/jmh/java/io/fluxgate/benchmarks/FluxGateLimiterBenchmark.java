@@ -7,12 +7,18 @@ import io.fluxgate.core.policy.LimitPolicy;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAdder;
 
@@ -75,7 +81,7 @@ public class FluxGateLimiterBenchmark {
     private ConcurrentHashMap<Long, LongAdder> spikeSamples;
     private long spikeThresholdNanos = 10_000L; // 10 microseconds
     // adaptive state sampling
-    private java.util.concurrent.ConcurrentLinkedQueue<Double> adaptiveShares;
+    private ConcurrentLinkedQueue<Double> adaptiveShares;
     private long sampleCounter;
 
     @Setup(Level.Trial)
@@ -215,14 +221,13 @@ public class FluxGateLimiterBenchmark {
         // Print a few high-level stats so benchmark logs can be post-processed.
         Runtime rt = Runtime.getRuntime();
         long used = rt.totalMemory() - rt.freeMemory();
-        StringBuilder sb = new StringBuilder();
-        sb.append("FluxGateLimiterBenchmark: finished trial;");
-        sb.append(" hotCount=").append(hotCount);
-        sb.append(" keySpace=").append(keySpace);
-        sb.append(" seed=").append(seed);
-        sb.append(" verify=").append(verifyEnabled);
-        sb.append(" heapUsedBytes=").append(used);
-        System.out.println(sb.toString());
+        String sb = "FluxGateLimiterBenchmark: finished trial;" +
+                " hotCount=" + hotCount +
+                " keySpace=" + keySpace +
+                " seed=" + seed +
+                " verify=" + verifyEnabled +
+                " heapUsedBytes=" + used;
+        System.out.println(sb);
 
         if (verifyEnabled && exactCounts != null) {
             // compute top-K heavy hitters from ground truth
@@ -241,13 +246,13 @@ public class FluxGateLimiterBenchmark {
                 }
             }
             // extract in descending order into a simple map
-            Map<Long, Long> topK = new java.util.LinkedHashMap<>();
-            java.util.List<Map.Entry<Long, LongAdder>> list = new java.util.ArrayList<>();
+            final Map<Long, Long> topK = new LinkedHashMap<>();
+            java.util.List<Map.Entry<Long, LongAdder>> list = new ArrayList<>();
             while (!pq.isEmpty()) {
                 list.add(pq.poll());
             }
             list.sort((a, b) -> Long.compare(b.getValue().longValue(), a.getValue().longValue()));
-            for (Map.Entry<Long, LongAdder> e : list) {
+            for (final var e : list) {
                 topK.put(e.getKey(), e.getValue().longValue());
             }
             System.out.println("FluxGateLimiterBenchmark: top-" + k + " ground-truth keys: " + topK);
@@ -285,9 +290,9 @@ public class FluxGateLimiterBenchmark {
 
             // Also write a structured JSON file for robust downstream parsing; include spike/adaptive metrics.
             try {
-                java.nio.file.Path resultsDir = java.nio.file.Paths.get("benchmarks", "results");
-                java.nio.file.Files.createDirectories(resultsDir);
-                java.nio.file.Path outFile = resultsDir.resolve("verify_" + seed + ".json");
+                Path resultsDir = java.nio.file.Paths.get("benchmarks", "results");
+                Files.createDirectories(resultsDir);
+                Path outFile = resultsDir.resolve("verify_" + seed + ".json");
                 StringBuilder sbj = new StringBuilder();
                 sbj.append('{');
                 sbj.append("\"seed\":\"").append(seed).append('\"');
@@ -303,7 +308,7 @@ public class FluxGateLimiterBenchmark {
                 double adaptiveStd = 0.0d;
                 int aCount = 0;
                 if (adaptiveShares != null) {
-                    java.util.List<Double> tmp = new java.util.ArrayList<>();
+                    final List<Double> tmp = new ArrayList<>();
                     adaptiveShares.forEach(tmp::add);
                     aCount = tmp.size();
                     if (aCount > 0) {
@@ -329,7 +334,7 @@ public class FluxGateLimiterBenchmark {
                 double adaptiveLatencyP95 = -1.0d;
                 double adaptiveLatencyP99 = -1.0d;
                 if (doAdaptive) {
-                    java.util.List<Long> latencies = new java.util.ArrayList<>();
+                    final List<Long> latencies = new ArrayList<>();
                     try {
                         // perform several independent spike injections and measure latency to observe change
                         for (int round = 0; round < 3; round++) {
@@ -387,7 +392,7 @@ public class FluxGateLimiterBenchmark {
                 }
                 sbj.append(",\"topKList\":{");
                 boolean first = true;
-                for (Map.Entry<Long, Long> e2 : topK.entrySet()) {
+                for (final var e2 : topK.entrySet()) {
                     if (!first) {
                         sbj.append(',');
                     }
@@ -401,7 +406,7 @@ public class FluxGateLimiterBenchmark {
                 sbj.append(',').append("\"adaptiveLatencyP95\":").append(adaptiveLatencyP95);
                 sbj.append(',').append("\"adaptiveLatencyP99\":").append(adaptiveLatencyP99);
                 sbj.append('}');
-                java.nio.file.Files.writeString(outFile, sbj.toString());
+                Files.writeString(outFile, sbj.toString());
             } catch (Exception ignore) {
                 // Best-effort only
             }
