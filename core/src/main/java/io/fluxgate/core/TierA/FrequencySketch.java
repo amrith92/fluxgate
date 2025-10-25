@@ -1,4 +1,4 @@
-package io.fluxgate.core.TierA;
+package io.fluxgate.core.tierA;
 
 import java.util.concurrent.ThreadLocalRandom;
 

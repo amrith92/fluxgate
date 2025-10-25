@@ -1,4 +1,4 @@
-package io.fluxgate.core.TierA;
+package io.fluxgate.core.tierA;
 
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -141,6 +141,10 @@ public final class HybridHotKeyCache<K, V> {
 
     public synchronized int hotSize() {
         return mainCache.size();
+    }
+
+    public int getCapacity() {
+        return capacity;
     }
 
     private static final class CacheEntry<V> {

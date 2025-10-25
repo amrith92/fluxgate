@@ -1,9 +1,10 @@
-package io.fluxgate.core.TierA;
+package io.fluxgate.core.tierA;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class HybridHotKeyCacheTest {
 
