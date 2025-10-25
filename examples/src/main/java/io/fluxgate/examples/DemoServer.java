@@ -7,7 +7,12 @@ import spark.Service;
 public final class DemoServer {
 
     public static void main(String[] args) {
-        FluxGate limiter = FluxGate.builder().build();
+        FluxGate limiter = FluxGate.builder()
+                // See docs/TUNING_GUIDE.md for sizing guidance on cache and sketch options.
+                .withSecret("demo-secret")
+                .withShardCapacity(32_768)
+                .withSketch(4, 1 << 15)
+                .build();
         Service http = Service.ignite().port(8080);
         http.before((request, response) -> {
             RateLimitResult result = limiter.check(new FluxGate.RequestContext() {

@@ -1,0 +1,9 @@
+policies:
+  - id: checkout
+    limitPerSecond: 1
+    burst: 1
+    windowSeconds: 1
+    match:
+      any:
+        - route: "/checkout/**"
+        - route: "/api/**"

@@ -107,10 +107,18 @@ project(':adapters:resilience4j') {
 }
 
 project(':examples') {
+    apply plugin: 'application'
+
     dependencies {
         implementation project(':api')
+        implementation project(':core')
+        implementation project(':adapters:resilience4j')
         implementation 'com.sparkjava:spark-core:2.9.4'
         implementation 'org.slf4j:slf4j-simple:2.0.12'
+    }
+
+    application {
+        mainClass = 'io.fluxgate.examples.ExampleLauncher'
     }
 }
 
