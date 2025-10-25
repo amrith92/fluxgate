@@ -50,6 +50,9 @@ public class FluxGateLimiterBenchmark {
     @Param({"false"})
     private String verify;
 
+    @Param({"false"})
+    private String adaptiveCheck;
+
     // --- core objects used by benchmarks ---
     private FluxGateLimiter limiter;
     private FluxGateStats stats;
@@ -67,6 +70,13 @@ public class FluxGateLimiterBenchmark {
     // verification structures (optional)
     private boolean verifyEnabled;
     private ConcurrentHashMap<Long, LongAdder> exactCounts;
+    // spike/tail detection
+    private java.util.concurrent.atomic.LongAdder spikeCounter;
+    private ConcurrentHashMap<Long, LongAdder> spikeSamples;
+    private long spikeThresholdNanos = 10_000L; // 10 microseconds
+    // adaptive state sampling
+    private java.util.concurrent.ConcurrentLinkedQueue<Double> adaptiveShares;
+    private long sampleCounter;
 
     @Setup(Level.Trial)
     public void setup() {
@@ -81,6 +91,9 @@ public class FluxGateLimiterBenchmark {
         verifyEnabled = Boolean.parseBoolean(verify);
         if (verifyEnabled) {
             exactCounts = new ConcurrentHashMap<>();
+            spikeCounter = new java.util.concurrent.atomic.LongAdder();
+            spikeSamples = new ConcurrentHashMap<>();
+            adaptiveShares = new java.util.concurrent.ConcurrentLinkedQueue<>();
         }
 
         stats = new FluxGateStats();
@@ -137,7 +150,30 @@ public class FluxGateLimiterBenchmark {
     public void allowHotPath(Blackhole blackhole) {
         long key = keys[hotKeyBase + (rng.nextInt(hotCount))];
         long now = System.nanoTime() + baseTimeNanos;
+        long t0 = System.nanoTime();
         FluxGateLimiter.RateLimitOutcome outcome = limiter.check(key, ignored -> allowPolicy, now);
+        long latency = System.nanoTime() - t0;
+        if (verifyEnabled && latency > spikeThresholdNanos) {
+            spikeCounter.increment();
+            spikeSamples.computeIfAbsent(key, k -> new LongAdder()).increment();
+        }
+        // sample adaptive state occasionally
+        if (verifyEnabled && (++sampleCounter % 1000L) == 0L) {
+            var state = limiter.adaptiveState(now);
+            if (state != null) {
+                try {
+                    Double share = null;
+                    var dv = state.debugView();
+                    if (dv != null && dv.containsKey("share")) {
+                        share = dv.get("share");
+                    }
+                    if (share != null) {
+                        adaptiveShares.add(share);
+                    }
+                } catch (Exception ignore) {
+                }
+            }
+        }
         if (verifyEnabled) {
             exactCounts.computeIfAbsent(key, k -> new LongAdder()).increment();
         }
@@ -149,7 +185,25 @@ public class FluxGateLimiterBenchmark {
     public void blockColdPath(Blackhole blackhole) {
         long key = keys[coldKeyBase + (rng.nextInt(keySpace - hotCount))];
         long now = System.nanoTime() + baseTimeNanos;
+        long t0 = System.nanoTime();
         FluxGateLimiter.RateLimitOutcome outcome = limiter.check(key, ignored -> blockPolicy, now);
+        long latency = System.nanoTime() - t0;
+        if (verifyEnabled && latency > spikeThresholdNanos) {
+            spikeCounter.increment();
+            spikeSamples.computeIfAbsent(key, k -> new LongAdder()).increment();
+        }
+        if (verifyEnabled && (++sampleCounter % 1000L) == 0L) {
+            var state = limiter.adaptiveState(now);
+            if (state != null) {
+                try {
+                    var dv = state.debugView();
+                    if (dv != null && dv.containsKey("share")) {
+                        adaptiveShares.add(dv.get("share"));
+                    }
+                } catch (Exception ignore) {
+                }
+            }
+        }
         if (verifyEnabled) {
             exactCounts.computeIfAbsent(key, k -> new LongAdder()).increment();
         }
@@ -171,21 +225,21 @@ public class FluxGateLimiterBenchmark {
         System.out.println(sb.toString());
 
         if (verifyEnabled && exactCounts != null) {
-             // compute top-K heavy hitters from ground truth
-             int k = 10;
+            // compute top-K heavy hitters from ground truth
+            int k = 10;
             Comparator<Map.Entry<Long, LongAdder>> comparator = Comparator.comparingLong(e -> e.getValue().longValue());
             PriorityQueue<Map.Entry<Long, LongAdder>> pq = new PriorityQueue<>(comparator);
-             for (Map.Entry<Long, LongAdder> e : exactCounts.entrySet()) {
-                 if (pq.size() < k) {
-                     pq.offer(e);
-                     continue;
-                 }
-                 long val = e.getValue().longValue();
-                 if (val > pq.peek().getValue().longValue()) {
-                     pq.poll();
-                     pq.offer(e);
-                 }
-             }
+            for (Map.Entry<Long, LongAdder> e : exactCounts.entrySet()) {
+                if (pq.size() < k) {
+                    pq.offer(e);
+                    continue;
+                }
+                long val = e.getValue().longValue();
+                if (val > pq.peek().getValue().longValue()) {
+                    pq.poll();
+                    pq.offer(e);
+                }
+            }
             // extract in descending order into a simple map
             Map<Long, Long> topK = new java.util.LinkedHashMap<>();
             java.util.List<Map.Entry<Long, LongAdder>> list = new java.util.ArrayList<>();
@@ -196,7 +250,7 @@ public class FluxGateLimiterBenchmark {
             for (Map.Entry<Long, LongAdder> e : list) {
                 topK.put(e.getKey(), e.getValue().longValue());
             }
-             System.out.println("FluxGateLimiterBenchmark: top-" + k + " ground-truth keys: " + topK);
+            System.out.println("FluxGateLimiterBenchmark: top-" + k + " ground-truth keys: " + topK);
 
             // Compute promotion precision and tier-B error using limiter hooks
             int promoted = 0;
@@ -229,7 +283,7 @@ public class FluxGateLimiterBenchmark {
             csv.append("topK=").append(trueHot);
             System.out.println(csv.toString());
 
-            // Also write a structured JSON file for robust downstream parsing.
+            // Also write a structured JSON file for robust downstream parsing; include spike/adaptive metrics.
             try {
                 java.nio.file.Path resultsDir = java.nio.file.Paths.get("benchmarks", "results");
                 java.nio.file.Files.createDirectories(resultsDir);
@@ -242,19 +296,115 @@ public class FluxGateLimiterBenchmark {
                 sbj.append(",\"promoted\":").append(promoted);
                 sbj.append(",\"topK\":").append(trueHot);
                 sbj.append(",\"heapUsedBytes\":").append(used);
+                long spikes = spikeCounter == null ? 0L : spikeCounter.longValue();
+                sbj.append(",\"spikeCount\":").append(spikes);
+                // adaptive share stats
+                double adaptiveMean = 0.0d;
+                double adaptiveStd = 0.0d;
+                int aCount = 0;
+                if (adaptiveShares != null) {
+                    java.util.List<Double> tmp = new java.util.ArrayList<>();
+                    adaptiveShares.forEach(tmp::add);
+                    aCount = tmp.size();
+                    if (aCount > 0) {
+                        double sum = 0.0d;
+                        for (double v : tmp) {
+                            sum += v;
+                        }
+                        adaptiveMean = sum / aCount;
+                        double var = 0.0d;
+                        for (double v : tmp) {
+                            var += (v - adaptiveMean) * (v - adaptiveMean);
+                        }
+                        adaptiveStd = Math.sqrt(var / aCount);
+                    }
+                }
+                sbj.append(",\"adaptiveSampleCount\":").append(aCount);
+                sbj.append(",\"adaptiveMean\":").append(adaptiveMean);
+                sbj.append(",\"adaptiveStd\":").append(adaptiveStd);
+                // optionally perform an adaptive convergence latency check (best-effort)
+                boolean doAdaptive = Boolean.parseBoolean(adaptiveCheck);
+                int adaptiveLatencyCount = 0;
+                double adaptiveLatencyP50 = -1.0d;
+                double adaptiveLatencyP95 = -1.0d;
+                double adaptiveLatencyP99 = -1.0d;
+                if (doAdaptive) {
+                    java.util.List<Long> latencies = new java.util.ArrayList<>();
+                    try {
+                        // perform several independent spike injections and measure latency to observe change
+                        for (int round = 0; round < 3; round++) {
+                            long start = System.nanoTime();
+                            var beforeState = limiter.adaptiveState(start);
+                            double beforeShare = 0.0d;
+                            if (beforeState != null) {
+                                beforeState.debugView();
+                                if (beforeState.debugView().containsKey("share")) {
+                                    beforeShare = beforeState.debugView().get("share");
+                                }
+                            }
+                            double spikeQps = Math.max(1.0d, Math.abs(beforeShare) * 100.0d + 1.0d);
+                            limiter.ingestClusterQps(spikeQps, start);
+                            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                            long observed = -1L;
+                            while (System.nanoTime() < deadline) {
+                                var s = limiter.adaptiveState(System.nanoTime());
+                                if (s != null && s.debugView() != null && s.debugView().containsKey("share")) {
+                                    double cur = s.debugView().get("share");
+                                    double diff = Math.abs(cur - beforeShare);
+                                    double thresh = Math.max(0.01d, 0.15d * Math.abs(beforeShare));
+                                    if (diff > thresh) {
+                                        observed = System.nanoTime() - start;
+                                        break;
+                                    }
+                                }
+                                try {
+                                    Thread.sleep(5);
+                                } catch (InterruptedException ignored) {
+                                    Thread.currentThread().interrupt();
+                                    break;
+                                }
+                            }
+                            if (observed >= 0L) {
+                                latencies.add(TimeUnit.NANOSECONDS.toMillis(observed));
+                            }
+                            // small pause before next injection to let system stabilize
+                            try {
+                                Thread.sleep(20);
+                            } catch (InterruptedException ignored) {
+                                Thread.currentThread().interrupt();
+                            }
+                        }
+                    } catch (Exception ignore) {
+                        // best-effort only
+                    }
+                    adaptiveLatencyCount = latencies.size();
+                    if (adaptiveLatencyCount > 0) {
+                        latencies.sort(Long::compare);
+                        adaptiveLatencyP50 = latencies.get((int) Math.floor(0.5 * (adaptiveLatencyCount - 1)));
+                        adaptiveLatencyP95 = latencies.get((int) Math.floor(0.95 * (adaptiveLatencyCount - 1)));
+                        adaptiveLatencyP99 = latencies.get((int) Math.floor(0.99 * (adaptiveLatencyCount - 1)));
+                    }
+                }
                 sbj.append(",\"topKList\":{");
                 boolean first = true;
                 for (Map.Entry<Long, Long> e2 : topK.entrySet()) {
-                    if (!first) sbj.append(',');
+                    if (!first) {
+                        sbj.append(',');
+                    }
                     sbj.append('"').append(e2.getKey()).append('"').append(':').append(e2.getValue());
                     first = false;
                 }
                 sbj.append('}');
+                // append adaptive quantiles
+                sbj.append(',').append("\"adaptiveLatencyCount\":").append(adaptiveLatencyCount);
+                sbj.append(',').append("\"adaptiveLatencyP50\":").append(adaptiveLatencyP50);
+                sbj.append(',').append("\"adaptiveLatencyP95\":").append(adaptiveLatencyP95);
+                sbj.append(',').append("\"adaptiveLatencyP99\":").append(adaptiveLatencyP99);
                 sbj.append('}');
                 java.nio.file.Files.writeString(outFile, sbj.toString());
             } catch (Exception ignore) {
                 // Best-effort only
             }
-         }
-     }
- }
+        }
+    }
+}
