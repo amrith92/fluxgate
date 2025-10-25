@@ -1,40 +1,43 @@
 package io.fluxgate.api;
 
 import io.fluxgate.core.FluxGateLimiter;
+import io.fluxgate.core.policy.CompiledPolicySet;
 import io.fluxgate.core.policy.KeyBuilder;
 import io.fluxgate.core.policy.LimitPolicy;
 import io.fluxgate.core.policy.PolicyCompiler;
+import io.fluxgate.core.policy.PolicyContext;
+import io.fluxgate.core.policy.PolicyDecision;
 
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
 
 public final class FluxGate {
 
     private final FluxGateLimiter limiter;
-    private final Function<Long, LimitPolicy> policyLookup;
+    private final CompiledPolicySet policySet;
     private final String secret;
 
     private FluxGate(Builder builder) {
         this.secret = builder.secret;
-        Collection<LimitPolicy> policies = builder.policies;
-        if (policies == null) {
+        CompiledPolicySet compiled = builder.policySet;
+        if (compiled == null) {
             if (builder.policyPath != null) {
-                policies = PolicyCompiler.fromYaml(Path.of(builder.policyPath));
+                compiled = PolicyCompiler.fromYaml(Path.of(builder.policyPath));
             } else if (builder.policyStream != null) {
-                policies = PolicyCompiler.fromYaml(builder.policyStream);
+                compiled = PolicyCompiler.fromYaml(builder.policyStream);
             } else {
-                policies = PolicyCompiler.defaults();
+                compiled = PolicyCompiler.defaults();
             }
         }
 
-        final var finalPolicies = policies;
-        this.policyLookup = key -> finalPolicies.stream().findFirst().orElse(null);
+        this.policySet = compiled;
         this.limiter = FluxGateLimiter.builder()
-                .withPolicies(policies)
+                .withPolicySet(compiled)
                 .withShardCapacity(builder.shardCapacity)
                 .withSketch(builder.sketchDepth, builder.sketchWidth)
                 .withRotationPeriod(builder.rotationPeriod)
@@ -42,15 +45,24 @@ public final class FluxGate {
     }
 
     public RateLimitResult check(RequestContext ctx) {
+        Map<String, String> attributes = ctx.attributes();
+        PolicyContext context = new PolicyContext(ctx.ip(), ctx.route(), attributes);
+        LimitPolicy policy = policySet.firstMatch(context).orElse(null);
         long keyHash = KeyBuilder.of()
                 .ip(ctx.ip())
                 .route(ctx.route())
+                .attributes(attributes)
                 .buildHash(secret);
-        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(keyHash, policyLookup, System.nanoTime());
+        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(keyHash, ignored -> policy, System.nanoTime());
         if (outcome.allowed()) {
             return RateLimitResult.allowed();
         }
         return RateLimitResult.blocked(RetryAfter.ofNanos(outcome.retryAfterNanos()));
+    }
+
+    public List<PolicyDecision> evaluatePolicies(RequestContext ctx) {
+        PolicyContext context = new PolicyContext(ctx.ip(), ctx.route(), ctx.attributes());
+        return policySet.evaluate(context);
     }
 
     public FluxGateLimiter limiter() {
@@ -65,10 +77,14 @@ public final class FluxGate {
         String ip();
 
         String route();
+
+        default Map<String, String> attributes() {
+            return Map.of();
+        }
     }
 
     public static final class Builder {
-        private Collection<LimitPolicy> policies;
+        private CompiledPolicySet policySet;
         private String policyPath;
         private InputStream policyStream;
         private String secret = "fluxgate";
@@ -78,7 +94,12 @@ public final class FluxGate {
         private Duration rotationPeriod = Duration.ofSeconds(1);
 
         public Builder withPolicies(Collection<LimitPolicy> policies) {
-            this.policies = policies;
+            this.policySet = CompiledPolicySet.of(policies);
+            return this;
+        }
+
+        public Builder withPolicySet(CompiledPolicySet policySet) {
+            this.policySet = Objects.requireNonNull(policySet, "policySet");
             return this;
         }
 
