@@ -1,0 +1,2 @@
+{"benchmarks":[{"benchmark":"io.fluxgate.benchmarks.FluxGateLimiterBenchmark.allowHotPath","mode":"thrpt","primaryMetric":{"score":12345.0,"scoreUnit":"ops/s","rawData":[[0.9,1.0,1.1,0.95,1.05]]}}]}
+

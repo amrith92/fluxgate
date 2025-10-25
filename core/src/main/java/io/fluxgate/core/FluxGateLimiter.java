@@ -110,6 +110,22 @@ public final class FluxGateLimiter {
         stats.onAdaptiveUpdate(state);
     }
 
+    /**
+     * Returns whether a given key hash is currently present in the Tier-A hot cache.
+     * This is a read-only helper used by benchmarks and diagnostics.
+     */
+    public boolean isHot(long keyHash) {
+        return hotCache.isHot(keyHash);
+    }
+
+    /**
+     * Returns the sketch's estimate for the provided key.
+     * Exposed for benchmark verification and diagnostics.
+     */
+    public long sketchEstimate(long keyHash) {
+        return sketch.estimate(keyHash);
+    }
+
     public record RateLimitOutcome(boolean allowed, long retryAfterNanos) {
         public static RateLimitOutcome allow() {
             return new RateLimitOutcome(true, 0);
