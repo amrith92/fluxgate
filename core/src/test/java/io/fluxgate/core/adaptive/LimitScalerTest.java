@@ -7,26 +7,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LimitScalerTest {
 
     @Test
-    void scaleReturnsScaledLimitForPositiveShare() {
-        // Arrange
+    void scaleReturnsScaledLimitUsingAdaptiveState() {
         LimitScaler scaler = new LimitScaler();
+        EwmaTrafficEstimator.AdaptiveState state = new EwmaTrafficEstimator.AdaptiveState(50d, 100d, 0L);
 
-        // Act
-        double limit = scaler.scale(100d, 0.5d);
+        double limit = scaler.scale(200d, state);
 
-        // Assert
-        assertThat(limit).isEqualTo(50d);
+        assertThat(limit).isEqualTo(100d);
     }
 
     @Test
-    void scaleReturnsGlobalLimitWhenShareNonPositive() {
-        // Arrange
+    void scaleFallsBackWhenShareNonPositive() {
         LimitScaler scaler = new LimitScaler();
 
-        // Act
-        double limit = scaler.scale(100d, 0d);
+        double limit = scaler.scale(100d, -1d);
 
-        // Assert
         assertThat(limit).isEqualTo(100d);
     }
 }

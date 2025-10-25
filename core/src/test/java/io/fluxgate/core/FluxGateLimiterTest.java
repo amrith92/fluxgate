@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,6 +40,8 @@ class FluxGateLimiterTest {
         assertThat(metrics.blocked.get()).isZero();
         assertThat(stats.totalRequests()).isEqualTo(1);
         assertThat(stats.blockedRequests()).isZero();
+        assertThat(metrics.lastAdaptiveState.get()).isNotNull();
+        assertThat(stats.adaptiveDebugView()).containsKeys("localQps", "clusterQps", "share");
     }
 
     @Test
@@ -72,6 +75,27 @@ class FluxGateLimiterTest {
     }
 
     @Test
+    void ingestClusterQpsPublishesAdaptiveState() {
+        TestMetrics metrics = new TestMetrics();
+        FluxGateStats stats = new FluxGateStats();
+        FluxGateLimiter limiter = FluxGateLimiter.builder()
+                .withMetrics(metrics)
+                .withStats(stats)
+                .withEstimator(new EwmaTrafficEstimator())
+                .withLimitScaler(new LimitScaler())
+                .withShardCapacity(4)
+                .withSketch(2, 16)
+                .withRotationPeriod(Duration.ofMillis(5))
+                .build();
+
+        limiter.ingestClusterQps(250d, Duration.ofSeconds(1).toNanos());
+
+        assertThat(metrics.lastAdaptiveState.get()).isNotNull();
+        assertThat(stats.adaptiveState()).isNotNull();
+        assertThat(stats.adaptiveState().clusterQps()).isGreaterThanOrEqualTo(1d);
+    }
+
+    @Test
     void registerPolicyStoresPolicyForIntrospection() {
         // Arrange
         FluxGateLimiter limiter = FluxGateLimiter.builder().build();
@@ -100,6 +124,7 @@ class FluxGateLimiterTest {
 
         private final AtomicInteger allowed = new AtomicInteger();
         private final AtomicInteger blocked = new AtomicInteger();
+        private final AtomicReference<EwmaTrafficEstimator.AdaptiveState> lastAdaptiveState = new AtomicReference<>();
 
         @Override
         public void recordAllowed() {
@@ -109,6 +134,11 @@ class FluxGateLimiterTest {
         @Override
         public void recordBlocked() {
             blocked.incrementAndGet();
+        }
+
+        @Override
+        public void recordAdaptiveState(EwmaTrafficEstimator.AdaptiveState state) {
+            lastAdaptiveState.set(state);
         }
     }
 }

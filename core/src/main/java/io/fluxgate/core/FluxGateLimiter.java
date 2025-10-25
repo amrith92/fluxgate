@@ -57,7 +57,8 @@ public final class FluxGateLimiter {
             return RateLimitOutcome.allow();
         }
 
-        double scaledLimit = limitScaler.scale(policy.limitPerSecond(), estimator.instanceShare());
+        EwmaTrafficEstimator.AdaptiveState adaptiveState = estimator.observe(nowNanos);
+        double scaledLimit = limitScaler.scale(policy.limitPerSecond(), adaptiveState);
         GcraLimiter limiter = hotCache.getOrCompute(keyHash,
                 () -> new GcraLimiter(Duration.ofSeconds(1).toNanos(), scaledLimit, policy.burstTokens()));
 
@@ -65,6 +66,8 @@ public final class FluxGateLimiter {
         if (outcome.allowed()) {
             metrics.recordAllowed();
             stats.onAllowed();
+            EwmaTrafficEstimator.AdaptiveState updatedState = estimator.recordLocalPermits(1L, nowNanos);
+            publishAdaptiveState(updatedState);
             sketch.increment(keyHash, nowNanos);
             heavyKeeper.offer(keyHash);
             rotator.rotateIfNeeded(nowNanos);
@@ -73,6 +76,7 @@ public final class FluxGateLimiter {
 
         metrics.recordBlocked();
         stats.onBlocked();
+        publishAdaptiveState(adaptiveState);
         return RateLimitOutcome.blocked(outcome.retryAfterNanos());
     }
 
@@ -90,6 +94,20 @@ public final class FluxGateLimiter {
 
     public FluxGateStats stats() {
         return stats;
+    }
+
+    public void ingestClusterQps(double clusterQps, long nowNanos) {
+        EwmaTrafficEstimator.AdaptiveState state = estimator.ingestClusterEstimate(clusterQps, nowNanos);
+        publishAdaptiveState(state);
+    }
+
+    public EwmaTrafficEstimator.AdaptiveState adaptiveState(long nowNanos) {
+        return estimator.observe(nowNanos);
+    }
+
+    private void publishAdaptiveState(EwmaTrafficEstimator.AdaptiveState state) {
+        metrics.recordAdaptiveState(state);
+        stats.onAdaptiveUpdate(state);
     }
 
     public record RateLimitOutcome(boolean allowed, long retryAfterNanos) {
