@@ -1,23 +1,93 @@
 # FluxGate
 
-FluxGate is an adaptive, in-memory rate limiting library for Java microservices. It combines precise per-key control with approximate long-tail accounting so that services can enforce fairness without an external data store. This repository contains the core library modules, the public API facade, an example server, and supporting tests and benchmarks.
+FluxGate is an adaptive, in-memory rate limiting library for Java microservices. It combines precise per-key control with approximate long-tail accounting so that services can enforce fairness without an external data store. The repository contains the core limiter engine, a small public API facade, integrations, and runnable examples.
 
-## Motivation and capabilities
+## Overview
 
-Applications that depend on distributed rate limiters often struggle with network hops, cross-region coordination, and hot key protection. FluxGate addresses these concerns by keeping decision logic local to the JVM. The library scales to millions of distinct keys per minute by classifying traffic into hot and cold paths. Hot keys receive exact enforcement through a lock free implementation of the Generalized Cell Rate Algorithm while colder keys flow through a probabilistic sketch backed by a heavy hitter detector. The result is consistent single digit microsecond latency and high precision on the keys that matter.
+FluxGate keeps decisions local to the JVM. Incoming requests are evaluated against compiled policies, hashed into deterministic keys, and routed to a hybrid enforcement pipeline. Hot keys graduate into an exact limiter while colder traffic is tracked probabilistically. Every component is implemented in plain Java with minimal dependencies so the library can be embedded into latency-sensitive services.
 
-FluxGate ships with a policy compiler for attribute based matching, adaptive scaling that proportionally divides shared quotas across instances, and integration hooks that mirror popular frameworks such as resilience4j. Observability is embedded from the start, with metrics, heatmaps, and saturation tracking exposed through simple interfaces.
+### Architecture at a glance
 
-## Project layout
+FluxGate begins every decision by compiling YAML policies into a static matcher graph. `PolicyCompiler` maps CIDR ranges into a `PatriciaTrie`, compresses HTTP routes into a wildcard-aware `RouteTrie`, and rewrites attribute predicates so the generated `CompiledPolicySet` can walk through requests with no allocations. The API layer feeds each request through `KeyBuilder`, which folds caller attributes, network coordinates, and a shared secret into a stable 64-bit hash. Once a hash exists, `FluxGateLimiter` steers it into the tiered pipeline.
 
-The Gradle build produces multiple modules aligned with the runtime components:
+The first tier is a hot key cache shaped by `HybridHotKeyCache`. A probation ring soaks up one-off traffic while a TinyLFU-style frequency sketch decides when a key deserves residency in the main heap. Once promoted, the key gains its own lock-free `GcraLimiter`, which maintains theoretical arrival times in an `AtomicLong` and computes precise retry-after values when bursts exceed policy. The second tier retains the long tail. `CountMinLogSketch` tracks approximate counters for dormant keys, `HeavyKeeper` spots emerging heavy hitters, and `SliceRotator` rewinds sketch slices to keep stale counts from polluting the estimate.
 
-- `core`: Internal rate limiting engines, caches, adaptive scaling, and observability primitives.
-- `api`: Public entry points used by service integrations, including configuration loading and response types.
-- `examples`: A lightweight HTTP server that demonstrates end-to-end usage of the limiter.
-- `test`: Unit and integration tests that validate Tier A precision, Tier B accuracy, and policy compilation.
+Adaptive limit sharing closes the loop. Observed local throughput is smoothed by `EwmaTrafficEstimator`, combined with optional cluster-wide hints, and fed into `LimitScaler`, which derives the instance’s share of a global limit. Decisions flow outward through `FluxGateMetrics` and in-memory snapshots in `FluxGateStats`, while `HeatmapReporter` turns heavy-hitter telemetry into plain-text heatmaps for quick inspection.
 
-Each module is organized under the `io.fluxgate` package hierarchy for straightforward dependency management.
+All of the pieces above are orchestrated by `FluxGateLimiter`, which is wrapped by the `FluxGate` facade exposed from the `api` module. The adapter layer currently ships with a Resilience4j-style decorator so that applications can insert FluxGate inside existing resilience pipelines.
+
+## Module layout
+
+FluxGate’s Gradle project mirrors the runtime architecture. The `core` module carries the limiter engine, probabilistic data structures, policy compiler, adaptive scaler, and observability hooks. The `api` module narrows the surface to a few public entry points—`FluxGate`, `RateLimitResult`, `RetryAfter`, and `ConfigLoader`—so application code depends on a small, stable set of types. Integration adapters live under `adapters`, with the Resilience4j module providing a drop-in decorator for teams already using that ecosystem. Runnable guides sit in `examples`, and regression coverage is concentrated under `test`.
+
+## Getting started
+
+Add FluxGate to your service by constructing a `FluxGate` instance during application startup:
+
+```java
+FluxGate limiter = FluxGate.builder()
+        .withConfig(Path.of("config/limits.yaml"))
+        .withSecret("service-specific-secret")
+        .withShardCapacity(32_768)
+        .build();
+
+FluxGate.RequestContext ctx = new FluxGate.RequestContext() {
+    @Override
+    public String ip() {
+        return clientIp;
+    }
+
+    @Override
+    public String route() {
+        return requestPath;
+    }
+
+    @Override
+    public Map<String, String> attributes() {
+        return Map.of("userTier", tier);
+    }
+};
+
+RateLimitResult result = limiter.check(ctx);
+if (!result.isAllowed()) {
+    return Response.status(429)
+            .header("Retry-After", result.retryAfter().seconds())
+            .build();
+}
+```
+
+The builder accepts configuration from a file path, an input stream, or an already compiled `CompiledPolicySet`. Supplying a unique secret ensures keys remain stable even if attribute ordering changes.
+
+### Policy configuration
+
+Policies live in YAML under a top-level `policies` array. Each entry declares an identifier, the desired rate and burst, and a matcher block that combines attributes, routes, and IP ranges into a decision tree:
+
+```yaml
+policies:
+  - id: checkout-ip
+    limitPerSecond: 200
+    burst: 400
+    windowSeconds: 60
+    match:
+      ip:
+        - 10.0.0.0/8
+        - 203.0.113.24
+  - id: premium-users
+    limitPerSecond: 500
+    burst: 600
+    match:
+      all:
+        - route: "/checkout/**"
+        - attribute:
+            name: userTier
+            anyOf: [premium, enterprise]
+```
+
+Match expressions support logical composition via `all`, `any`, and `not`. Specialized matchers cover CIDR ranges (`ip`), wildcard-aware route patterns (`route`), and exact or set membership filters on arbitrary attributes. Policies are evaluated in the order they are declared; the first match wins during enforcement, while `evaluatePolicies` exposes full decision traces for diagnostics.
+
+### Adaptive limits and observability
+
+FluxGate can adapt global limits to the local traffic profile by ingesting optional cluster-wide QPS estimates. The `EwmaTrafficEstimator` smooths samples with an exponentially weighted moving average, and `LimitScaler` multiplies the configured limit by the computed share. Results are emitted through the `FluxGateMetrics` interface and mirrored in the `FluxGateStats` in-memory counters so that services can export metrics through Micrometer, Dropwizard, or custom sinks. For quick troubleshooting, instantiate a `HeatmapReporter` with the limiter’s `HeavyKeeper` instance to inspect the most active keys.
 
 ## Building and running tests
 
@@ -28,20 +98,8 @@ FluxGate uses the Gradle wrapper checked into the repository. The following comm
 ./gradlew test
 ```
 
-The build depends on the standard Gradle toolchain and a Java 17 compatible runtime. All tasks are cache friendly and configured for incremental execution. The GitHub Actions workflow located under `.github/workflows/ci.yml` runs the same commands for continuous integration.
-
-## Configuring the limiter
-
-Policies are defined in YAML and compiled into `LimitPolicy` instances. The compiler accepts attribute selectors that can combine IPs, routes, headers, and custom tags. Burst capacity and sustained rate are expressed in requests per second with explicit time windows. Runtime code creates a `FluxGate` instance via the builder, supplying policies, sketch sizing parameters, and shard counts. The API returns a `RateLimitResult` that indicates whether the request is allowed together with an optional `RetryAfter` hint for clients.
-
-FluxGate supports both static configuration files and programmatic policy construction. Reload hooks can instantiate a new limiter and swap it into service with minimal disruption because the implementation maintains lock free data structures per shard.
-
-## Observability and integration
-
-Operators integrate FluxGate with Micrometer, Dropwizard Metrics, or custom monitoring stacks through the `FluxGateMetrics` facade. Reported metrics cover request totals, blocked counts, hot key promotions, sketch saturation, and memory utilization. A dedicated heatmap reporter publishes latency and key distribution statistics so that on-call teams can investigate traffic anomalies quickly.
-
-The library includes adapters for resilience4j style decorators. This allows developers to plug FluxGate into existing circuit breaker pipelines and reuse familiar resilience patterns. The adaptive limit scaler tracks local QPS, compares it to an expected cluster total, and adjusts token generation so that each instance enforces its fair share.
+The build targets Java 17 and enables incremental compilation, code coverage (JaCoCo), and Checkstyle for static analysis.
 
 ## Documentation and further reading
 
-The `docs` directory houses a detailed algorithmic design deep dive that explains how each component works internally. Benchmark harnesses and stress scenarios provide additional guidance for tuning the limiter in production environments.
+See [`docs/ALGORITHMIC_DESIGN.md`](docs/ALGORITHMIC_DESIGN.md) for a deeper dive into the caches, sketches, and concurrency model that underpin FluxGate. Benchmarks and example deployments under `benchmarks/` and `examples/` illustrate how to size caches and interpret limiter telemetry in production environments.

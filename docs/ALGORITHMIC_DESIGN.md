@@ -1,39 +1,37 @@
 # Algorithmic Design Deep Dive
 
-FluxGate enforces rate limits through two cooperating tiers that balance precision and scalability. This document describes the data structures, scheduling strategy, and concurrency guarantees that allow the limiter to sustain high request volumes with bounded latency.
+FluxGate enforces rate limits through two cooperating tiers that balance precision and scalability. This document describes the request lifecycle, the data structures that back each tier, and the adaptive controls that keep enforcement consistent under changing load.
 
-## Tier A hot key control
+## Request journey
 
-Tier A stores keys that receive a large share of traffic. Each shard keeps a segmented LRU cache backed by a hybrid admission policy that combines a TinyLFU-inspired frequency sketch with a probationary FIFO window. The first time a key arrives it enters the probation window. A follow-up hit or a sufficiently high sketch score promotes the key into the precise GCRA cache. This two-phase approach reacts quickly to bursts while still filtering one-hit traffic. Eviction samples a handful of candidates and removes the entry with the weakest combined frequency and recency score so that cold keys fall out promptly while hot keys remain protected.
+Every decision starts at the policy compiler. YAML rules are flattened into a matcher graph composed of prefix tries for network ranges, wildcard-aware trees for routes, and attribute predicates. The graph is precomputed so that the runtime only performs pointer walks without allocating. Incoming requests are wrapped in lightweight contexts that expose IP, route, and arbitrary attributes. These fields are combined with a per-service secret to produce a stable 64-bit fingerprint, which anchors accounting in both tiers.
 
-The Generalized Cell Rate Algorithm models traffic as a virtual departure schedule. Every key maintains a theoretical arrival time that advances by the token period. Requests succeed when the current time plus burst allowance exceeds the stored arrival time. FluxGate implements this logic with compare-and-set loops on padded atomic longs. Shards map directly to CPU cores so that no two threads contend for the same atomic variable. The limiter returns a retry hint that equals the difference between the scheduled time and the current moment when a request is rejected.
+Once the fingerprint is available, the runtime chooses a control strategy. A tier manager keeps a hot cache for dominant keys and a probabilistic sketch for the long tail. The manager updates both views on every request so that a key can move fluidly between tiers as traffic fluctuates.
 
-Tier A rotation relies on periodic maintenance tasks that prune expired entries. The segmented cache records the last access timestamp for each segment. Background threads sweep the coolest segment first, which minimizes work during heavy load and avoids pauses on the hot path.
+## Tier A — precise guardianship
 
-## Tier B long tail accounting
+The hot tier focuses on keys that dominate throughput. Admission begins with a probation ring buffer that filters single-hit noise before keys enter the main cache. Residency is governed by a TinyLFU-style frequency sketch that approximates recent popularity with minimal memory. When a key survives the probation period and earns enough frequency, it is granted a dedicated exact limiter.
 
-Cold keys bypass the GCRA cache and are recorded in a windowed Count Min Log Sketch. The sketch is organized into multiple slices, each tied to an epoch counter. When a request touches a cell whose epoch is stale, the cell resets lazily before the new count is added. Counters use a logarithmic representation similar to Morris counting so that one byte can represent large values while retaining relative accuracy.
+Each exact limiter implements the Generalized Cell Rate Algorithm with lock-free compare-and-swap loops. The limiter stores the theoretical next-allowed arrival time in nanoseconds. On every request it subtracts the current time, decides whether the new arrival fits inside the configured burst envelope, and either grants the request or returns a precise retry-after interval. Because the state lives in a single atomic primitive, hot keys can be updated concurrently without global locks.
 
-FluxGate applies conservative updates across all hash rows to bound the probability of overcounting. Queries compute the minimum count across the rows that correspond to the key and aggregate results across the slices that fall inside the observation window. The number of slices controls the trade off between accuracy and memory footprint.
+## Tier B — probabilistic stewardship
 
-A HeavyKeeper structure monitors the same stream to detect emerging hot keys. Each row in the structure maintains a candidate key, a score, and a decay factor. When a key collides with an existing candidate, the score increases; otherwise the score decays and the candidate may be replaced. Keys whose scores cross the promotion threshold migrate into Tier A where they gain precise enforcement.
+Keys that remain outside the hot cache are tracked by a count-min sketch with logarithmic counters. The sketch is laid out in slices; each slice covers a time window, and writes lazily reset stale cells the first time a request enters a fresh window. A rotor periodically advances the active slice to prevent counts from accumulating indefinitely. This approach ensures the sketch approximates request volume while keeping memory bounded.
 
-## Adaptive limit scaling
+Detecting heavy hitters relies on a companion structure inspired by HeavyKeeper. Each request hashes into candidate slots that remember the currently suspected key and a decaying score. Matching requests refresh the score; mismatches decay it until a new candidate displaces the old one. When the score crosses a threshold, the key is promoted into Tier A. The same structure can emit ranked lists that feed heatmap diagnostics.
 
-Distributed deployments often share a global quota. FluxGate adjusts per instance limits using an exponentially weighted moving average of observed QPS. The estimator integrates request counts over a sliding window and smooths spikes to avoid oscillations. The limit scaler multiplies the global limit by the local share of traffic, yielding a target rate for the shard. Because shard adjustments apply during the token refill step, the limiter maintains stability even when the cluster topology changes.
+## Adaptive quota sharing
 
-## Concurrency model
+FluxGate often operates alongside other instances that share a global budget. To stay fair, every instance maintains an exponentially weighted moving average of observed queries per second. Optional gossip feeds provide cluster-wide estimates. A scaling component multiplies the configured global limit by the local share and clamps the result so that every instance receives at least a trickle of capacity. The runtime records the derived limit, the observed load, and the moving average so operators can reason about how quotas evolve over time.
 
-Shards isolate state updates to per core arenas. Requests select a shard by hashing the key and taking a modulus of the configured shard count. Within a shard, Tier A entries use atomic operations without locking, and Tier B sketches rely on striped arrays padded to cache line boundaries. Maintenance work such as slice rotation and statistics publishing occurs on dedicated threads that coordinate through lightweight barriers, ensuring that request threads remain wait free.
+## Concurrency posture
 
-## Observability pipeline
+Hot-tier caches rely on short synchronized sections to protect eviction metadata, but the critical region is small because eviction samples only touch a handful of candidates. Exact limiters, sketches, and adaptive estimators all use atomic primitives to avoid blocking. Rotations in the sketch and adaptive state snapshots run under single-writer guards, ensuring only one thread pays the cost of resetting counters. The resulting pipeline keeps latency predictable even when multiple threads hammer the same keys.
 
-FluxGate exposes metrics that mirror the structure of the limiter. Counters report total requests, blocked attempts, Tier promotions, and memory consumption. Gauges track sketch saturation and cache occupancy. A heatmap reporter samples request latencies and key distribution so that operators can detect emerging hot spots before they impact customers. The metrics facade intentionally decouples the data model from any particular monitoring framework, allowing adapters to translate the information into Micrometer, Dropwizard, or custom registries.
+## Observability thread
 
-## Integration guidance
+FluxGate emits events at two layers. Immediate decisions (allowed, throttled, retry-after) funnel into an abstract metrics interface so integrators can bridge into Micrometer, Dropwizard, or bespoke sinks. In parallel, an in-memory statistics view accumulates counters, the latest adaptive scaling state, and the current heavy-hitter list. Operators combine both streams to diagnose policy behavior, verify cache residency, and tune limits without touching the hot path.
 
-Service owners integrate FluxGate by constructing a `FluxGate` instance during application startup. Policies load from YAML files or structured configuration stores. Incoming requests pass through the limiter before business logic executes. When the limiter denies a request, clients receive a `RetryAfter` value that encodes the wait time in milliseconds. The resilience4j adapter wraps the `FluxGate` check inside familiar decorators so that teams can reuse established resilience patterns without refactoring core logic.
+## Future explorations
 
-## Future extensions
-
-The current design prioritizes local decision making. Future work can explore optional shared state replication, GPU accelerated sketch updates, or automatic policy tuning based on downstream latency signals. These enhancements would retain the same architecture while expanding the scenarios in which FluxGate operates.
+The current design emphasizes local decision making. Future work could explore optional replication of sketch deltas, richer adaptive inputs such as downstream saturation, or pluggable eviction strategies that adapt to bursty tenants. These enhancements would extend the existing architecture without rewriting the hot path or policy compiler.
