@@ -1,5 +1,6 @@
 package io.fluxgate.core;
 
+import io.fluxgate.core.TierA.HybridHotKeyCache;
 import io.fluxgate.core.adaptive.EwmaTrafficEstimator;
 import io.fluxgate.core.adaptive.LimitScaler;
 import io.fluxgate.core.observability.FluxGateMetrics;
@@ -7,7 +8,6 @@ import io.fluxgate.core.observability.FluxGateStats;
 import io.fluxgate.core.policy.LimitPolicy;
 import io.fluxgate.core.policy.PolicyCompiler;
 import io.fluxgate.core.tierA.GcraLimiter;
-import io.fluxgate.core.tierA.TinyLfuCache;
 import io.fluxgate.core.tierB.CountMinLogSketch;
 import io.fluxgate.core.tierB.HeavyKeeper;
 import io.fluxgate.core.tierB.SliceRotator;
