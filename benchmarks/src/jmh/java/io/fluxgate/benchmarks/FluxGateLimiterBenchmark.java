@@ -1,9 +1,9 @@
 package io.fluxgate.benchmarks;
 
 import io.fluxgate.core.FluxGateLimiter;
-import io.fluxgate.core.Observability.FluxGateMetrics;
-import io.fluxgate.core.Observability.FluxGateStats;
-import io.fluxgate.core.Policy.LimitPolicy;
+import io.fluxgate.core.observability.FluxGateMetrics;
+import io.fluxgate.core.observability.FluxGateStats;
+import io.fluxgate.core.policy.LimitPolicy;
 import java.time.Duration;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;

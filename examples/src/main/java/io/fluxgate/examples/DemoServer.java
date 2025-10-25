@@ -22,7 +22,7 @@ public final class DemoServer {
                     return request.pathInfo();
                 }
             });
-            if (!result.allowed()) {
+            if (!result.isAllowed()) {
                 response.status(429);
                 response.header("Retry-After", String.valueOf(result.retryAfter().seconds()));
                 halt(429, "Too many requests\n");

@@ -2,7 +2,7 @@ package io.fluxgate.adapters.resilience4j;
 
 import io.fluxgate.core.FluxGateLimiter;
 import io.fluxgate.core.FluxGateLimiter.RateLimitOutcome;
-import io.fluxgate.core.Policy.LimitPolicy;
+import io.fluxgate.core.policy.LimitPolicy;
 
 import java.time.Duration;
 import java.util.Objects;

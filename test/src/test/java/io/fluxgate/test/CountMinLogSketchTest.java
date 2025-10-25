@@ -2,7 +2,7 @@ package io.fluxgate.test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.fluxgate.core.TierB.CountMinLogSketch;
+import io.fluxgate.core.tierB.CountMinLogSketch;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 

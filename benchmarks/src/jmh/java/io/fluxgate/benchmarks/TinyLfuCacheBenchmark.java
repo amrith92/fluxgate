@@ -1,6 +1,6 @@
 package io.fluxgate.benchmarks;
 
-import io.fluxgate.core.TierA.TinyLfuCache;
+import io.fluxgate.core.tierA.TinyLfuCache;
 import java.util.concurrent.ThreadLocalRandom;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;

@@ -1,6 +1,6 @@
 package io.fluxgate.api;
 
-public record RateLimitResult(boolean allowed, RetryAfter retryAfter) {
+public record RateLimitResult(boolean isAllowed, RetryAfter retryAfter) {
 
     public static RateLimitResult allowed() {
         return new RateLimitResult(true, RetryAfter.zero());

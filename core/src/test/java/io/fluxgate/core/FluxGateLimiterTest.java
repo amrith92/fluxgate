@@ -2,11 +2,11 @@ package io.fluxgate.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.fluxgate.core.Adaptive.EwmaTrafficEstimator;
-import io.fluxgate.core.Adaptive.LimitScaler;
-import io.fluxgate.core.Observability.FluxGateMetrics;
-import io.fluxgate.core.Observability.FluxGateStats;
-import io.fluxgate.core.Policy.LimitPolicy;
+import io.fluxgate.core.adaptive.EwmaTrafficEstimator;
+import io.fluxgate.core.adaptive.LimitScaler;
+import io.fluxgate.core.observability.FluxGateMetrics;
+import io.fluxgate.core.observability.FluxGateStats;
+import io.fluxgate.core.policy.LimitPolicy;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;

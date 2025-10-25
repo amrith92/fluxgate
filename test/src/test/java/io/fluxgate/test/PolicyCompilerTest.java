@@ -2,10 +2,10 @@ package io.fluxgate.test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.fluxgate.core.Policy.PolicyCompiler;
+import io.fluxgate.core.policy.PolicyCompiler;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 public final class PolicyCompilerTest {

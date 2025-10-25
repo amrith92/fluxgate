@@ -29,7 +29,7 @@ public final class FluxGateIntegrationTest {
         RateLimitResult second = limiter.check(ctx);
 
         // Assert
-        assertThat(first.allowed()).isTrue();
-        assertThat(second.allowed()).isFalse();
+        assertThat(first.isAllowed()).isTrue();
+        assertThat(second.isAllowed()).isFalse();
     }
 }

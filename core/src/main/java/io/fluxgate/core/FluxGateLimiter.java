@@ -1,16 +1,16 @@
 package io.fluxgate.core;
 
-import io.fluxgate.core.Adaptive.EwmaTrafficEstimator;
-import io.fluxgate.core.Adaptive.LimitScaler;
-import io.fluxgate.core.Observability.FluxGateMetrics;
-import io.fluxgate.core.Observability.FluxGateStats;
-import io.fluxgate.core.Policy.LimitPolicy;
-import io.fluxgate.core.Policy.PolicyCompiler;
-import io.fluxgate.core.TierA.GcraLimiter;
-import io.fluxgate.core.TierA.TinyLfuCache;
-import io.fluxgate.core.TierB.CountMinLogSketch;
-import io.fluxgate.core.TierB.HeavyKeeper;
-import io.fluxgate.core.TierB.SliceRotator;
+import io.fluxgate.core.adaptive.EwmaTrafficEstimator;
+import io.fluxgate.core.adaptive.LimitScaler;
+import io.fluxgate.core.observability.FluxGateMetrics;
+import io.fluxgate.core.observability.FluxGateStats;
+import io.fluxgate.core.policy.LimitPolicy;
+import io.fluxgate.core.policy.PolicyCompiler;
+import io.fluxgate.core.tierA.GcraLimiter;
+import io.fluxgate.core.tierA.TinyLfuCache;
+import io.fluxgate.core.tierB.CountMinLogSketch;
+import io.fluxgate.core.tierB.HeavyKeeper;
+import io.fluxgate.core.tierB.SliceRotator;
 
 import java.time.Duration;
 import java.util.Collection;
