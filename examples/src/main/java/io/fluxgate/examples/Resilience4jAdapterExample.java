@@ -9,6 +9,7 @@ import io.fluxgate.core.policy.LimitPolicy;
 import io.fluxgate.core.policy.PolicyCompiler;
 import io.fluxgate.core.policy.PolicyContext;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
@@ -25,7 +26,12 @@ public final class Resilience4jAdapterExample {
     }
 
     public static void main(String[] args) {
-        CompiledPolicySet policies = PolicyCompiler.fromYaml(Path.of("examples/config/limits.yaml"));
+        Path policyPath = Path.of("config", "limits.yaml");
+        if (!Files.exists(policyPath)) {
+            policyPath = Path.of("examples", "config", "limits.yaml");
+        }
+
+        CompiledPolicySet policies = PolicyCompiler.fromYaml(policyPath);
         FluxGate fluxGate = FluxGate.builder()
                 .withPolicySet(policies)
                 .withSecret("resilience4j-demo")
