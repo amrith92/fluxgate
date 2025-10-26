@@ -108,3 +108,4 @@ Additional guides are available under `docs/`:
 
 * [`docs/TUNING_GUIDE.md`](docs/TUNING_GUIDE.md) documents the most important knobs on the limiter builders, including hot-cache sizing, sketch rotation, and adaptive controller settings.
 * [`docs/EXAMPLES.md`](docs/EXAMPLES.md) walks through the runnable samples, including a Resilience4j decorator that caches matched policies and reuses FluxGate’s retry-after metadata.
+* [Benchmark results](docs/BENCHMARK_REPORT.md) present the full verification report, including environment details and visual summaries of throughput, latency, and accuracy.
