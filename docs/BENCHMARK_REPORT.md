@@ -78,42 +78,42 @@ Aggregated statistics validate long-run stability and confirm the absence of pat
 Hot and cold path medians illustrate the latency separation between cache hits and misses while remaining within service-level objectives.
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
-xychart-beta
+---
+config:
+  theme: neutral
+---
+xychart
     title: "FluxGate Latency Profile (Median)"
-    xLabel: "Benchmark Path"
-    yLabel: "Nanoseconds per Operation"
+    x-axis:
+      title: "Benchmark Path"
+      categories: ["Hot Path", "Cold Path"]
+    y-axis:
+      title: "Nanoseconds per Operation"
     series:
-      - name: Latency
-        data:
-          - x: "Hot Path"
-            y: 380
-          - x: "Cold Path"
-            y: 1700
+      - title: "Latency"
+        type: column
+        data: [380, 1700]
 ```
 
 ### Error Rate Distribution Across Seeds
 Error deltas relative to perfect accuracy remain tightly clustered below one percent, reinforcing the reliability of Tier B estimations.
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
-xychart-beta
+---
+config:
+  theme: neutral
+---
+xychart
     title: "Tier B Error Delta by Seed"
-    xLabel: Seed
-    yLabel: "Error Delta (%)"
+    x-axis:
+      title: "Seed"
+      categories: [123456, 234567, 345678, 456789, 567890]
+    y-axis:
+      title: "Error Delta (%)"
     series:
-      - name: "Error Delta"
-        data:
-          - x: 123456
-            y: 0.31
-          - x: 234567
-            y: 0.36
-          - x: 345678
-            y: 0.73
-          - x: 456789
-            y: 0.24
-          - x: 567890
-            y: 0.20
+      - title: "Error Delta"
+        type: column
+        data: [0.31, 0.36, 0.73, 0.24, 0.20]
 ```
 
 ### Thread Count and Scalability Correlation
@@ -127,13 +127,19 @@ The benchmark configuration exercised eight threads. The table and chart below p
 | 8            | 2.5000               | 0.3125                   | Measured (hot path `thrpt`) |
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
-xychart-beta
+---
+config:
+  theme: neutral
+---
+xychart
     title: "Throughput vs Thread Count"
-    xLabel: "Threads"
-    yLabel: "Throughput (M ops/s)"
+    x-axis:
+      title: "Threads"
+    y-axis:
+      title: "Throughput (M ops/s)"
     series:
-      - name: "Projected Linear Scaling"
+      - title: "Projected Linear Scaling"
+        type: line
         data:
           - x: 1
             y: 0.3125
@@ -143,7 +149,8 @@ xychart-beta
             y: 1.2500
           - x: 8
             y: 2.5000
-      - name: "Measured Hot Path"
+      - title: "Measured Hot Path"
+        type: scatter
         data:
           - x: 8
             y: 2.5000
