@@ -80,15 +80,15 @@ Hot and cold path medians illustrate the latency separation between cache hits a
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%
 xychart-beta
-    title: FluxGate Latency Profile (Median)
-    xLabel: Benchmark Path
-    yLabel: Nanoseconds per Operation
+    title: "FluxGate Latency Profile (Median)"
+    xLabel: "Benchmark Path"
+    yLabel: "Nanoseconds per Operation"
     series:
       - name: Latency
         data:
-          - x: Hot Path
+          - x: "Hot Path"
             y: 380
-          - x: Cold Path
+          - x: "Cold Path"
             y: 1700
 ```
 
@@ -98,11 +98,11 @@ Error deltas relative to perfect accuracy remain tightly clustered below one per
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%
 xychart-beta
-    title: Tier B Error Delta by Seed
+    title: "Tier B Error Delta by Seed"
     xLabel: Seed
-    yLabel: Error Delta (%)
+    yLabel: "Error Delta (%)"
     series:
-      - name: Error Delta
+      - name: "Error Delta"
         data:
           - x: 123456
             y: 0.31
@@ -129,11 +129,11 @@ The benchmark configuration exercised eight threads. The table and chart below p
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%
 xychart-beta
-    title: Throughput vs Thread Count
-    xLabel: Threads
-    yLabel: Throughput (M ops/s)
+    title: "Throughput vs Thread Count"
+    xLabel: "Threads"
+    yLabel: "Throughput (M ops/s)"
     series:
-      - name: Projected Linear Scaling
+      - name: "Projected Linear Scaling"
         data:
           - x: 1
             y: 0.3125
@@ -143,7 +143,7 @@ xychart-beta
             y: 1.2500
           - x: 8
             y: 2.5000
-      - name: Measured Hot Path
+      - name: "Measured Hot Path"
         data:
           - x: 8
             y: 2.5000
