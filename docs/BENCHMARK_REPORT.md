@@ -83,16 +83,10 @@ config:
   theme: neutral
 ---
 xychart-beta
-    title: "FluxGate Latency Profile (Median)"
-    xAxis:
-        title: "Benchmark Path"
-        categories: ["Hot Path", "Cold Path"]
-    yAxis:
-        title: "Nanoseconds per Operation"
-    series:
-        - type: bar
-          name: "Latency"
-          data: [380, 1700]
+    title "FluxGate Latency Profile (Median)"
+    x-axis "Benchmark Path" ["Hot Path", "Cold Path"]
+    y-axis "Latency (ns/op)" 
+    bar [380, 1700]
 ```
 
 ### Error Rate Distribution Across Seeds
@@ -104,16 +98,10 @@ config:
   theme: neutral
 ---
 xychart-beta
-    title: "Tier B Error Delta by Seed"
-    xAxis:
-        title: "Seed"
-        categories: [123456, 234567, 345678, 456789, 567890]
-    yAxis:
-        title: "Error Delta (%)"
-    series:
-        - type: bar
-          name: "Error Delta"
-          data: [0.31, 0.36, 0.73, 0.24, 0.20]
+    title "Tier B Error Delta by Seed"
+    x-axis "Seed" ["123456", "234567", "345678", "456789", "567890"]
+    y-axis "Error Delta (%)" 0 --> 1.0
+    bar [0.31, 0.36, 0.73, 0.24, 0.20]
 ```
 
 ### Thread Count and Scalability Correlation
@@ -132,28 +120,11 @@ config:
   theme: neutral
 ---
 xychart-beta
-    title: "Throughput vs Thread Count"
-    xAxis:
-        title: "Threads"
-    yAxis:
-        title: "Throughput (M ops/s)"
-    series:
-        - type: line
-          name: "Projected Linear Scaling"
-          data:
-            - x: 1
-              y: 0.3125
-            - x: 2
-              y: 0.6250
-            - x: 4
-              y: 1.2500
-            - x: 8
-              y: 2.5000
-        - type: scatter
-          name: "Measured Hot Path"
-          data:
-            - x: 8
-              y: 2.5000
+    title "Throughput vs Thread Count"
+    x-axis "Threads" [1, 2, 4, 8]
+    y-axis "Throughput (M ops/s)" 0 --> 3.0
+    line [0.3125, 0.6250, 1.2500, 2.5000]
+    line "Measured Hot Path" [0.5,1,1.5,2.5000]
 ```
 
 ## Consolidated Assessment
