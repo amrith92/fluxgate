@@ -82,11 +82,17 @@ Hot and cold path medians illustrate the latency separation between cache hits a
 config:
   theme: neutral
 ---
-xychart
-    title "FluxGate Latency Profile (Median)"
-    x-axis "Benchmark Path" ["Hot Path", "Cold Path"]
-    y-axis "Nanoseconds per Operation"
-    bar "Latency" [380, 1700]
+xychart-beta
+    title: "FluxGate Latency Profile (Median)"
+    xAxis:
+        title: "Benchmark Path"
+        categories: ["Hot Path", "Cold Path"]
+    yAxis:
+        title: "Nanoseconds per Operation"
+    series:
+        - type: bar
+          name: "Latency"
+          data: [380, 1700]
 ```
 
 ### Error Rate Distribution Across Seeds
@@ -97,11 +103,17 @@ Error deltas relative to perfect accuracy remain tightly clustered below one per
 config:
   theme: neutral
 ---
-xychart
-    title "Tier B Error Delta by Seed"
-    x-axis "Seed" [123456, 234567, 345678, 456789, 567890]
-    y-axis "Error Delta (%)"
-    bar "Error Delta" [0.31, 0.36, 0.73, 0.24, 0.20]
+xychart-beta
+    title: "Tier B Error Delta by Seed"
+    xAxis:
+        title: "Seed"
+        categories: [123456, 234567, 345678, 456789, 567890]
+    yAxis:
+        title: "Error Delta (%)"
+    series:
+        - type: bar
+          name: "Error Delta"
+          data: [0.31, 0.36, 0.73, 0.24, 0.20]
 ```
 
 ### Thread Count and Scalability Correlation
@@ -119,12 +131,29 @@ The benchmark configuration exercised eight threads. The table and chart below p
 config:
   theme: neutral
 ---
-xychart
-    title "Throughput vs Thread Count"
-    x-axis "Threads" [1, 2, 4, 8]
-    y-axis "Throughput (M ops/s)"
-    line "Projected Linear Scaling" [0.3125, 0.6250, 1.2500, 2.5000]
-    scatter "Measured Hot Path" [(8, 2.5000)]
+xychart-beta
+    title: "Throughput vs Thread Count"
+    xAxis:
+        title: "Threads"
+    yAxis:
+        title: "Throughput (M ops/s)"
+    series:
+        - type: line
+          name: "Projected Linear Scaling"
+          data:
+            - x: 1
+              y: 0.3125
+            - x: 2
+              y: 0.6250
+            - x: 4
+              y: 1.2500
+            - x: 8
+              y: 2.5000
+        - type: scatter
+          name: "Measured Hot Path"
+          data:
+            - x: 8
+              y: 2.5000
 ```
 
 ## Consolidated Assessment
