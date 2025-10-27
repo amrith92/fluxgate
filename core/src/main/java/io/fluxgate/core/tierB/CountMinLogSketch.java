@@ -12,7 +12,7 @@ public final class CountMinLogSketch {
     private final int depth;
     private final int width;
     private final long[][] counters;
-    private final long[] epochs;
+    private final long[][] epochs;
     private final long[] seeds;
     private final Duration sliceWindow;
 
@@ -21,7 +21,7 @@ public final class CountMinLogSketch {
         this.width = width;
         this.sliceWindow = sliceWindow;
         this.counters = new long[depth][width];
-        this.epochs = new long[width];
+        this.epochs = new long[depth][width];
         this.seeds = new long[depth];
         Random random = new Random(42L);
         for (int i = 0; i < depth; i++) {
@@ -32,11 +32,11 @@ public final class CountMinLogSketch {
     public void increment(long key, long nowNanos) {
         for (int i = 0; i < depth; i++) {
             int index = indexFor(key, i);
-            long epoch = epochs[index];
+            long epoch = epochs[i][index];
             long window = nowNanos / sliceWindow.toNanos();
             if (epoch != window) {
                 counters[i][index] = 0;
-                epochs[index] = window;
+                epochs[i][index] = window;
             }
             counters[i][index] = Math.min(Long.MAX_VALUE, counters[i][index] + 1);
         }
@@ -52,10 +52,10 @@ public final class CountMinLogSketch {
     }
 
     public void reset() {
-        for (long[] row : counters) {
-            Arrays.fill(row, 0);
+        for (int i = 0; i < depth; i++) {
+            Arrays.fill(counters[i], 0);
+            Arrays.fill(epochs[i], 0);
         }
-        Arrays.fill(epochs, 0);
     }
 
     int indexFor(long key, int depthIndex) {
