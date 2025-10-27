@@ -71,6 +71,10 @@ public final class PolicyCompiler {
                     case "route" -> matchers.add(routeMatcher(value));
                     case "attributes" -> matchers.add(attributesMatcher(value));
                     case "attribute" -> matchers.add(singleAttributeMatcher(value));
+                    case "headers" -> matchers.add(headersMatcher(value));
+                    case "header" -> matchers.add(singleHeaderMatcher(value));
+                    case "geo" -> matchers.add(geoMatcher(value));
+                    case "routeGroups", "routeGroup" -> matchers.add(routeGroupsMatcher(value));
                     default -> throw new IllegalArgumentException("Unknown matcher key: " + key);
                 }
             }
@@ -94,12 +98,11 @@ public final class PolicyCompiler {
             return matchers.get(0);
         }
         return context -> {
+            List<PolicyMatchResult> results = new ArrayList<>(matchers.size());
             for (PolicyMatcher matcher : matchers) {
-                if (!matcher.matches(context)) {
-                    return false;
-                }
+                results.add(matcher.evaluate(context));
             }
-            return true;
+            return PolicyMatchResult.aggregateAll(results);
         };
     }
 
@@ -112,14 +115,7 @@ public final class PolicyCompiler {
         } else {
             matchers.add(parseMatcher(node));
         }
-        return context -> {
-            for (PolicyMatcher matcher : matchers) {
-                if (!matcher.matches(context)) {
-                    return false;
-                }
-            }
-            return true;
-        };
+        return aggregate(matchers);
     }
 
     static PolicyMatcher anyMatcher(Object node) {
@@ -132,18 +128,19 @@ public final class PolicyCompiler {
             matchers.add(parseMatcher(node));
         }
         return context -> {
+            List<PolicyMatchResult> results = new ArrayList<>(matchers.size());
             for (PolicyMatcher matcher : matchers) {
-                if (matcher.matches(context)) {
-                    return true;
-                }
+                results.add(matcher.evaluate(context));
             }
-            return false;
+            return PolicyMatchResult.union(results);
         };
     }
 
     static PolicyMatcher notMatcher(Object node) {
         PolicyMatcher matcher = parseMatcher(node);
-        return context -> !matcher.matches(context);
+        return context -> matcher.evaluate(context).matched()
+                ? PolicyMatchResult.notMatched()
+                : PolicyMatchResult.matched(KeyContext.empty());
     }
 
     static PolicyMatcher ipMatcher(Object node) {
@@ -156,7 +153,13 @@ public final class PolicyCompiler {
             trie.insert(node.toString());
         }
         trie.freeze();
-        return context -> trie.matches(context.ip());
+        return context -> {
+            String ip = context.ip();
+            if (ip == null || !trie.matches(ip)) {
+                return PolicyMatchResult.notMatched();
+            }
+            return PolicyMatchResult.matched(KeyContext.of(KeyDimension.ip(), ip));
+        };
     }
 
     static PolicyMatcher routeMatcher(Object node) {
@@ -168,7 +171,13 @@ public final class PolicyCompiler {
         } else {
             trie.insert(node.toString());
         }
-        return context -> trie.matches(context.route());
+        return context -> {
+            String route = context.route();
+            if (route == null || !trie.matches(route)) {
+                return PolicyMatchResult.notMatched();
+            }
+            return PolicyMatchResult.matched(KeyContext.of(KeyDimension.route(), route));
+        };
     }
 
     static PolicyMatcher attributesMatcher(Object node) {
@@ -220,28 +229,228 @@ public final class PolicyCompiler {
             return context -> {
                 String attribute = context.attribute(name);
                 if (attribute == null) {
-                    return false;
+                    return PolicyMatchResult.notMatched();
                 }
                 if (!equalsValues.isEmpty() && !equalsValues.contains(attribute)) {
-                    return false;
+                    return PolicyMatchResult.notMatched();
                 }
                 if (!anyValues.isEmpty() && !anyValues.contains(attribute)) {
-                    return false;
+                    return PolicyMatchResult.notMatched();
                 }
                 if (!noneValues.isEmpty() && noneValues.contains(attribute)) {
-                    return false;
+                    return PolicyMatchResult.notMatched();
                 }
-                return true;
+                return PolicyMatchResult.matched(KeyContext.of(KeyDimension.attribute(name), attribute));
             };
         }
         if (config instanceof Iterable<?> iterable) {
             List<String> values = collectStrings(iterable);
-            return context -> values.contains(context.attribute(name));
+            return context -> {
+                String attribute = context.attribute(name);
+                if (attribute == null || !values.contains(attribute)) {
+                    return PolicyMatchResult.notMatched();
+                }
+                return PolicyMatchResult.matched(KeyContext.of(KeyDimension.attribute(name), attribute));
+            };
         }
         return context -> {
             String attribute = context.attribute(name);
-            return attribute != null && attribute.equals(config.toString());
+            if (attribute == null || !attribute.equals(config.toString())) {
+                return PolicyMatchResult.notMatched();
+            }
+            return PolicyMatchResult.matched(KeyContext.of(KeyDimension.attribute(name), attribute));
         };
+    }
+
+    static PolicyMatcher headersMatcher(Object node) {
+        if (!(node instanceof Map<?, ?> map)) {
+            throw new IllegalArgumentException("headers matcher expects map");
+        }
+        List<PolicyMatcher> matchers = new ArrayList<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            String header = entry.getKey().toString();
+            matchers.add(headerMatcher(header, entry.getValue()));
+        }
+        return aggregate(matchers);
+    }
+
+    static PolicyMatcher singleHeaderMatcher(Object node) {
+        if (!(node instanceof Map<?, ?> map)) {
+            throw new IllegalArgumentException("header matcher expects map");
+        }
+        Object nameNode = map.get("name");
+        if (nameNode == null) {
+            throw new IllegalArgumentException("header matcher requires name");
+        }
+        String header = nameNode.toString();
+        Map<String, Object> config = new HashMap<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            String key = entry.getKey().toString();
+            if (!"name".equals(key)) {
+                config.put(key, entry.getValue());
+            }
+        }
+        if (config.isEmpty() && !map.containsKey("equals")) {
+            throw new IllegalArgumentException("header matcher requires value");
+        }
+        Object valueConfig = config.isEmpty() ? map.get("equals") : config;
+        return headerMatcher(header, valueConfig);
+    }
+
+    static PolicyMatcher headerMatcher(String name, Object config) {
+        if (config instanceof Map<?, ?> map) {
+            Object equals = map.get("equals");
+            Object anyOf = map.get("anyOf");
+            Object noneOf = map.get("noneOf");
+            List<String> equalsValues = equals != null ? List.of(equals.toString()) : List.of();
+            List<String> anyValues = collectStrings(anyOf);
+            List<String> noneValues = collectStrings(noneOf);
+            if (equalsValues.isEmpty() && anyValues.isEmpty() && noneValues.isEmpty()) {
+                throw new IllegalArgumentException("header matcher requires equals/anyOf/noneOf");
+            }
+            return context -> {
+                String header = context.header(name);
+                if (header == null) {
+                    return PolicyMatchResult.notMatched();
+                }
+                if (!equalsValues.isEmpty() && !equalsValues.contains(header)) {
+                    return PolicyMatchResult.notMatched();
+                }
+                if (!anyValues.isEmpty() && !anyValues.contains(header)) {
+                    return PolicyMatchResult.notMatched();
+                }
+                if (!noneValues.isEmpty() && noneValues.contains(header)) {
+                    return PolicyMatchResult.notMatched();
+                }
+                return PolicyMatchResult.matched(KeyContext.of(KeyDimension.header(name), header));
+            };
+        }
+        if (config instanceof Iterable<?> iterable) {
+            List<String> values = collectStrings(iterable);
+            return context -> {
+                String header = context.header(name);
+                if (header == null || !values.contains(header)) {
+                    return PolicyMatchResult.notMatched();
+                }
+                return PolicyMatchResult.matched(KeyContext.of(KeyDimension.header(name), header));
+            };
+        }
+        return context -> {
+            String header = context.header(name);
+            if (header == null || !header.equals(config.toString())) {
+                return PolicyMatchResult.notMatched();
+            }
+            return PolicyMatchResult.matched(KeyContext.of(KeyDimension.header(name), header));
+        };
+    }
+
+    static PolicyMatcher geoMatcher(Object node) {
+        if (node instanceof Map<?, ?> map) {
+            Object equals = map.get("equals");
+            Object anyOf = map.get("anyOf");
+            Object noneOf = map.get("noneOf");
+            List<String> equalsValues = equals != null ? List.of(equals.toString()) : List.of();
+            List<String> anyValues = collectStrings(anyOf);
+            List<String> noneValues = collectStrings(noneOf);
+            if (equalsValues.isEmpty() && anyValues.isEmpty() && noneValues.isEmpty()) {
+                throw new IllegalArgumentException("geo matcher requires equals/anyOf/noneOf");
+            }
+            return context -> {
+                String geo = context.geo();
+                if (geo == null) {
+                    return PolicyMatchResult.notMatched();
+                }
+                if (!equalsValues.isEmpty() && !equalsValues.contains(geo)) {
+                    return PolicyMatchResult.notMatched();
+                }
+                if (!anyValues.isEmpty() && !anyValues.contains(geo)) {
+                    return PolicyMatchResult.notMatched();
+                }
+                if (!noneValues.isEmpty() && noneValues.contains(geo)) {
+                    return PolicyMatchResult.notMatched();
+                }
+                return PolicyMatchResult.matched(KeyContext.of(KeyDimension.geo(), geo));
+            };
+        }
+        if (node instanceof Iterable<?> iterable) {
+            List<String> values = collectStrings(iterable);
+            return context -> {
+                String geo = context.geo();
+                if (geo == null || !values.contains(geo)) {
+                    return PolicyMatchResult.notMatched();
+                }
+                return PolicyMatchResult.matched(KeyContext.of(KeyDimension.geo(), geo));
+            };
+        }
+        return context -> {
+            String geo = context.geo();
+            if (geo == null || !geo.equals(node.toString())) {
+                return PolicyMatchResult.notMatched();
+            }
+            return PolicyMatchResult.matched(KeyContext.of(KeyDimension.geo(), geo));
+        };
+    }
+
+    static PolicyMatcher routeGroupsMatcher(Object node) {
+        if (node instanceof Map<?, ?> map) {
+            String equals = map.get("equals") != null ? map.get("equals").toString() : null;
+            List<String> anyValues = collectStrings(map.get("anyOf"));
+            List<String> noneValues = collectStrings(map.get("noneOf"));
+            if (equals == null && anyValues.isEmpty() && noneValues.isEmpty()) {
+                throw new IllegalArgumentException("routeGroups matcher requires equals/anyOf/noneOf");
+            }
+            return context -> evaluateRouteGroups(context, equals, anyValues, noneValues);
+        }
+        if (node instanceof Iterable<?> iterable) {
+            List<String> anyValues = collectStrings(iterable);
+            return context -> evaluateRouteGroups(context, null, anyValues, List.of());
+        }
+        if (node != null) {
+            return context -> evaluateRouteGroups(context, node.toString(), List.of(), List.of());
+        }
+        throw new IllegalArgumentException("routeGroups matcher requires configuration");
+    }
+
+    private static PolicyMatchResult evaluateRouteGroups(PolicyContext context,
+                                                         String equalsValue,
+                                                         List<String> anyValues,
+                                                         List<String> noneValues) {
+        List<String> groups = context.routeGroups();
+        if (groups == null || groups.isEmpty()) {
+            return PolicyMatchResult.notMatched();
+        }
+        LinkedHashSet<String> matched = new LinkedHashSet<>(groups);
+        if (equalsValue != null) {
+            if (!matched.contains(equalsValue)) {
+                return PolicyMatchResult.notMatched();
+            }
+            matched.clear();
+            matched.add(equalsValue);
+        }
+        if (!anyValues.isEmpty()) {
+            LinkedHashSet<String> intersection = new LinkedHashSet<>();
+            for (String value : anyValues) {
+                if (matched.contains(value)) {
+                    intersection.add(value);
+                }
+            }
+            if (intersection.isEmpty()) {
+                return PolicyMatchResult.notMatched();
+            }
+            matched = intersection;
+        }
+        if (!noneValues.isEmpty()) {
+            for (String value : noneValues) {
+                matched.remove(value);
+            }
+        }
+        if (matched.isEmpty()) {
+            return PolicyMatchResult.notMatched();
+        }
+        List<KeyContext> contexts = matched.stream()
+                .map(value -> KeyContext.of(KeyDimension.routeGroup(), value))
+                .toList();
+        return PolicyMatchResult.matched(contexts);
     }
 
     static List<String> collectStrings(Object node) {

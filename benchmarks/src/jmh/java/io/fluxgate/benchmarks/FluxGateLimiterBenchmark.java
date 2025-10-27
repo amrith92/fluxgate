@@ -131,14 +131,14 @@ public class FluxGateLimiterBenchmark {
 
         for (int i = 0; i < hotWarmups; i++) {
             long key = keys[hotKeyBase + (rng.nextInt(hotCount))];
-            limiter.check(key, ignored -> allowPolicy, baseTimeNanos + i);
+            limiter.check(key, allowPolicy, baseTimeNanos + i);
             if (verifyEnabled) {
                 exactCounts.computeIfAbsent(key, k -> new LongAdder()).increment();
             }
         }
         for (int i = 0; i < coldWarmups; i++) {
             long key = keys[coldKeyBase + (rng.nextInt(keySpace - hotCount))];
-            limiter.check(key, ignored -> blockPolicy, baseTimeNanos + hotWarmups + i);
+            limiter.check(key, blockPolicy, baseTimeNanos + hotWarmups + i);
             if (verifyEnabled) {
                 exactCounts.computeIfAbsent(key, k -> new LongAdder()).increment();
             }
@@ -157,7 +157,7 @@ public class FluxGateLimiterBenchmark {
         long key = keys[hotKeyBase + (rng.nextInt(hotCount))];
         long now = System.nanoTime() + baseTimeNanos;
         long t0 = System.nanoTime();
-        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(key, ignored -> allowPolicy, now);
+        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(key, allowPolicy, now);
         long latency = System.nanoTime() - t0;
         if (verifyEnabled && latency > spikeThresholdNanos) {
             spikeCounter.increment();
@@ -192,7 +192,7 @@ public class FluxGateLimiterBenchmark {
         long key = keys[coldKeyBase + (rng.nextInt(keySpace - hotCount))];
         long now = System.nanoTime() + baseTimeNanos;
         long t0 = System.nanoTime();
-        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(key, ignored -> blockPolicy, now);
+        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(key, blockPolicy, now);
         long latency = System.nanoTime() - t0;
         if (verifyEnabled && latency > spikeThresholdNanos) {
             spikeCounter.increment();

@@ -32,7 +32,7 @@ class FluxGateLimiterTest {
         LimitPolicy policy = new LimitPolicy("ip", 5d, 5d, 60);
 
         // Act
-        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(42L, ignored -> policy, 0L);
+        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(42L, policy, 0L);
 
         // Assert
         assertThat(outcome.allowed()).isTrue();
@@ -61,9 +61,9 @@ class FluxGateLimiterTest {
         LimitPolicy policy = new LimitPolicy("ip", 2d, 2d, 60);
 
         // Act
-        limiter.check(99L, ignored -> policy, 0L);
-        limiter.check(99L, ignored -> policy, 0L);
-        FluxGateLimiter.RateLimitOutcome blocked = limiter.check(99L, ignored -> policy, 0L);
+        limiter.check(99L, policy, 0L);
+        limiter.check(99L, policy, 0L);
+        FluxGateLimiter.RateLimitOutcome blocked = limiter.check(99L, policy, 0L);
 
         // Assert
         assertThat(blocked.allowed()).isFalse();
@@ -114,7 +114,7 @@ class FluxGateLimiterTest {
         FluxGateLimiter limiter = FluxGateLimiter.builder().build();
 
         // Act
-        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(1L, ignored -> null, 0L);
+        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(1L, null, 0L);
 
         // Assert
         assertThat(outcome.allowed()).isTrue();

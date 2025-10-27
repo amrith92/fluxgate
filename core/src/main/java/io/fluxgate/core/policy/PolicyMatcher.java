@@ -8,9 +8,13 @@ package io.fluxgate.core.policy;
 @FunctionalInterface
 public interface PolicyMatcher {
 
-    boolean matches(PolicyContext context);
+    PolicyMatchResult evaluate(PolicyContext context);
+
+    default boolean matches(PolicyContext context) {
+        return evaluate(context).matched();
+    }
 
     static PolicyMatcher always() {
-        return ctx -> true;
+        return ctx -> PolicyMatchResult.matched(KeyContext.empty());
     }
 }

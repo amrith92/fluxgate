@@ -16,9 +16,7 @@ import io.fluxgate.core.tierB.SliceRotator;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 /**
  * FluxGateLimiter orchestrates Tier A and Tier B flow control. It is intentionally
@@ -50,9 +48,7 @@ public final class FluxGateLimiter {
         this.rotator = new SliceRotator(sketch, builder.rotationPeriod);
     }
 
-    public RateLimitOutcome check(long keyHash, Function<Long, LimitPolicy> policySupplier, long nowNanos) {
-        Objects.requireNonNull(policySupplier, "policySupplier");
-        LimitPolicy policy = policySupplier.apply(keyHash);
+    public RateLimitOutcome check(long keyHash, LimitPolicy policy, long nowNanos) {
         if (policy == null) {
             return RateLimitOutcome.allow();
         }

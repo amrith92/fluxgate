@@ -31,7 +31,7 @@ class FluxGateLimiterVerifyTest {
 
         // touch hotKey multiple times to promote it
         for (int i = 0; i < 50; i++) {
-            limiter.check(hotKey, ignored -> policy, System.nanoTime());
+            limiter.check(hotKey, policy, System.nanoTime());
         }
 
         // we expect the sketch to have non-zero estimate and the hot cache may contain it

@@ -36,4 +36,25 @@ public record CompiledPolicySet(List<LimitPolicy> policies) {
     public static CompiledPolicySet of(Collection<LimitPolicy> policies) {
         return new CompiledPolicySet(List.copyOf(policies));
     }
+
+    public List<PolicyBinding> bindings(PolicyContext context, String secret) {
+        List<PolicyBinding> bindings = new ArrayList<>();
+        for (LimitPolicy policy : policies) {
+            PolicyMatchResult result = policy.matcher().evaluate(context);
+            if (!result.matched()) {
+                continue;
+            }
+            List<Long> keys = PolicyKeyBuilder.buildKeys(policy.id(), result, secret);
+            if (!keys.isEmpty()) {
+                bindings.add(new PolicyBinding(policy, keys));
+            }
+        }
+        return bindings;
+    }
+
+    public record PolicyBinding(LimitPolicy policy, List<Long> keys) {
+        public PolicyBinding {
+            keys = List.copyOf(keys);
+        }
+    }
 }

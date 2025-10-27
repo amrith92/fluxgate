@@ -75,4 +75,40 @@ class PolicyCompilerMatchersTest {
         // attribute matcher requires value
         assertThrows(IllegalArgumentException.class, () -> PolicyCompiler.attributeMatcher("tier", Map.of()));
     }
+
+    @Test
+    void headerGeoAndRouteGroupMatchers() {
+        PolicyMatcher header = PolicyCompiler.singleHeaderMatcher(Map.of(
+                "name", "X-Tier",
+                "anyOf", List.of("gold", "platinum")
+        ));
+        PolicyMatcher geo = PolicyCompiler.geoMatcher(Map.of("anyOf", List.of("US", "CA")));
+        PolicyMatcher groups = PolicyCompiler.routeGroupsMatcher(Map.of("anyOf", List.of("search", "admin")));
+
+        PolicyContext context = new PolicyContext(
+                "10.0.0.1",
+                "/search",
+                Map.of(),
+                Map.of("X-Tier", "gold"),
+                "US",
+                List.of("search", "reports")
+        );
+
+        assertThat(header.matches(context)).isTrue();
+        assertThat(geo.matches(context)).isTrue();
+        assertThat(groups.matches(context)).isTrue();
+
+        PolicyContext miss = new PolicyContext(
+                "10.0.0.1",
+                "/search",
+                Map.of(),
+                Map.of("X-Tier", "bronze"),
+                "FR",
+                List.of("finance")
+        );
+
+        assertThat(header.matches(miss)).isFalse();
+        assertThat(geo.matches(miss)).isFalse();
+        assertThat(groups.matches(miss)).isFalse();
+    }
 }

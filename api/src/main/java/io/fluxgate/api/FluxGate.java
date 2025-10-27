@@ -2,7 +2,6 @@ package io.fluxgate.api;
 
 import io.fluxgate.core.FluxGateLimiter;
 import io.fluxgate.core.policy.CompiledPolicySet;
-import io.fluxgate.core.policy.KeyBuilder;
 import io.fluxgate.core.policy.LimitPolicy;
 import io.fluxgate.core.policy.PolicyCompiler;
 import io.fluxgate.core.policy.PolicyContext;
@@ -46,22 +45,32 @@ public final class FluxGate {
 
     public RateLimitResult check(RequestContext ctx) {
         Map<String, String> attributes = ctx.attributes();
-        PolicyContext context = new PolicyContext(ctx.ip(), ctx.route(), attributes);
-        LimitPolicy policy = policySet.firstMatch(context).orElse(null);
-        long keyHash = KeyBuilder.of()
-                .ip(ctx.ip())
-                .route(ctx.route())
-                .attributes(attributes)
-                .buildHash(secret);
-        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(keyHash, ignored -> policy, System.nanoTime());
-        if (outcome.allowed()) {
+        PolicyContext context = new PolicyContext(ctx.ip(), ctx.route(), attributes, ctx.headers(), ctx.geo(), ctx.routeGroups());
+        List<CompiledPolicySet.PolicyBinding> bindings = policySet.bindings(context, secret);
+        if (bindings.isEmpty()) {
             return RateLimitResult.allowed();
         }
-        return RateLimitResult.blocked(RetryAfter.ofNanos(outcome.retryAfterNanos()));
+        long now = System.nanoTime();
+        boolean allowed = true;
+        long retryAfter = 0L;
+        for (CompiledPolicySet.PolicyBinding binding : bindings) {
+            LimitPolicy policy = binding.policy();
+            for (Long key : binding.keys()) {
+                FluxGateLimiter.RateLimitOutcome outcome = limiter.check(key, policy, now);
+                if (!outcome.allowed()) {
+                    allowed = false;
+                    retryAfter = Math.max(retryAfter, outcome.retryAfterNanos());
+                }
+            }
+        }
+        if (allowed) {
+            return RateLimitResult.allowed();
+        }
+        return RateLimitResult.blocked(RetryAfter.ofNanos(retryAfter));
     }
 
     public List<PolicyDecision> evaluatePolicies(RequestContext ctx) {
-        PolicyContext context = new PolicyContext(ctx.ip(), ctx.route(), ctx.attributes());
+        PolicyContext context = new PolicyContext(ctx.ip(), ctx.route(), ctx.attributes(), ctx.headers(), ctx.geo(), ctx.routeGroups());
         return policySet.evaluate(context);
     }
 
@@ -80,6 +89,18 @@ public final class FluxGate {
 
         default Map<String, String> attributes() {
             return Map.of();
+        }
+
+        default Map<String, String> headers() {
+            return Map.of();
+        }
+
+        default String geo() {
+            return null;
+        }
+
+        default List<String> routeGroups() {
+            return List.of();
         }
     }
 
