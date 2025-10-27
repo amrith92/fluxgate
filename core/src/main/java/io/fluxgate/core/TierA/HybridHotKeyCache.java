@@ -71,6 +71,31 @@ public final class HybridHotKeyCache<K, V> {
         return newEntry.value;
     }
 
+    public synchronized V getIfPresent(K key) {
+        accessCounter++;
+        long now = accessCounter;
+
+        CacheEntry<V> entry = mainCache.get(key);
+        if (entry != null) {
+            entry.touch(now);
+            frequencySketch.increment(key);
+            return entry.value;
+        }
+
+        CacheEntry<V> probationEntry = probationQueue.remove(key);
+        if (probationEntry != null) {
+            probationEntry.touch(now);
+            frequencySketch.increment(key);
+            considerAdmission(key, probationEntry, now);
+            if (!mainCache.containsKey(key)) {
+                probationQueue.put(key, probationEntry);
+            }
+            return probationEntry.value;
+        }
+
+        return null;
+    }
+
     private void considerAdmission(K key, CacheEntry<V> entry, long now) {
         boolean hasHistory = entry.admissionTick < now;
         if (mainCache.size() < mainCapacity) {

@@ -63,15 +63,59 @@ class FluxGateLimiterTest {
         // Act
         limiter.check(99L, ignored -> policy, 0L);
         limiter.check(99L, ignored -> policy, 0L);
+        limiter.check(99L, ignored -> policy, 0L);
+        limiter.check(99L, ignored -> policy, 0L);
         FluxGateLimiter.RateLimitOutcome blocked = limiter.check(99L, ignored -> policy, 0L);
 
         // Assert
         assertThat(blocked.allowed()).isFalse();
         assertThat(blocked.retryAfterNanos()).isPositive();
+        assertThat(metrics.allowed.get()).isEqualTo(4);
+        assertThat(metrics.blocked.get()).isEqualTo(1);
+        assertThat(stats.totalRequests()).isEqualTo(5);
+        assertThat(stats.blockedRequests()).isEqualTo(1);
+    }
+
+    @Test
+    void coldKeysAreThrottledProbabilistically() {
+        TestMetrics metrics = new TestMetrics();
+        FluxGateStats stats = new FluxGateStats();
+        FluxGateLimiter limiter = FluxGateLimiter.builder()
+                .withMetrics(metrics)
+                .withStats(stats)
+                .withEstimator(new EwmaTrafficEstimator())
+                .withLimitScaler(new LimitScaler())
+                .withShardCapacity(4)
+                .withSketch(2, 16)
+                .withRotationPeriod(Duration.ofMillis(5))
+                .build();
+        LimitPolicy policy = new LimitPolicy("ip", 1d, 1d, 5);
+
+        FluxGateLimiter.RateLimitOutcome first = limiter.check(7L, ignored -> policy, 0L);
+        FluxGateLimiter.RateLimitOutcome second = limiter.check(7L, ignored -> policy, 0L);
+        FluxGateLimiter.RateLimitOutcome third = limiter.check(7L, ignored -> policy, 0L);
+
+        assertThat(first.allowed()).isTrue();
+        assertThat(second.allowed()).isTrue();
+        assertThat(third.allowed()).isFalse();
+        assertThat(limiter.isHot(7L)).isFalse();
         assertThat(metrics.allowed.get()).isEqualTo(2);
         assertThat(metrics.blocked.get()).isEqualTo(1);
-        assertThat(stats.totalRequests()).isEqualTo(3);
-        assertThat(stats.blockedRequests()).isEqualTo(1);
+    }
+
+    @Test
+    void retryAfterForSketchBlocksIsConservative() {
+        FluxGateLimiter limiter = FluxGateLimiter.builder()
+                .withRotationPeriod(Duration.ofMillis(5))
+                .build();
+        LimitPolicy policy = new LimitPolicy("client", 1d, 1d, 5);
+
+        limiter.check(11L, ignored -> policy, 0L);
+        limiter.check(11L, ignored -> policy, 0L);
+        FluxGateLimiter.RateLimitOutcome blocked = limiter.check(11L, ignored -> policy, 0L);
+
+        long expectedMinimum = Duration.ofSeconds(6).toNanos();
+        assertThat(blocked.retryAfterNanos()).isGreaterThanOrEqualTo(expectedMinimum);
     }
 
     @Test
