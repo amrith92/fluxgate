@@ -156,6 +156,9 @@ public final class FluxGateLimiter {
         double baseBudget = Math.max(0d, scaledLimit) * rotationSeconds;
         double burstBudget = Math.max(0d, policy.burstTokens());
         long budget = (long) Math.ceil(baseBudget + burstBudget);
+        if (budget <= 0L) {
+            return 0L;
+        }
         return Math.max(1L, budget);
     }
 

@@ -77,6 +77,31 @@ class FluxGateLimiterTest {
     }
 
     @Test
+    void zeroLimitPolicyBlocksImmediately() {
+        TestMetrics metrics = new TestMetrics();
+        FluxGateStats stats = new FluxGateStats();
+        FluxGateLimiter limiter = FluxGateLimiter.builder()
+                .withMetrics(metrics)
+                .withStats(stats)
+                .withEstimator(new EwmaTrafficEstimator())
+                .withLimitScaler(new LimitScaler())
+                .withShardCapacity(4)
+                .withSketch(2, 16)
+                .withRotationPeriod(Duration.ofMillis(5))
+                .build();
+        LimitPolicy policy = new LimitPolicy("ip", 0d, 0d, 60);
+
+        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(101L, ignored -> policy, 0L);
+
+        assertThat(outcome.allowed()).isFalse();
+        assertThat(outcome.retryAfterNanos()).isPositive();
+        assertThat(metrics.allowed.get()).isZero();
+        assertThat(metrics.blocked.get()).isEqualTo(1);
+        assertThat(stats.totalRequests()).isEqualTo(1);
+        assertThat(stats.blockedRequests()).isEqualTo(1);
+    }
+
+    @Test
     void coldKeysAreThrottledProbabilistically() {
         TestMetrics metrics = new TestMetrics();
         FluxGateStats stats = new FluxGateStats();
