@@ -4,7 +4,11 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
+import static io.fluxgate.core.policy.KeyContext.empty;
+import static io.fluxgate.core.policy.PolicyMatchResult.matched;
+import static io.fluxgate.core.policy.PolicyMatchResult.notMatched;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -12,8 +16,8 @@ class PolicyCompilerMatchersTest {
 
     @Test
     void aggregateAllAnyNotMatchers() {
-        PolicyMatcher m1 = ctx -> ctx.route().startsWith("/a");
-        PolicyMatcher m2 = ctx -> ctx.ip().startsWith("10.");
+        PolicyMatcher m1 = predicateMatcher(ctx -> ctx.route().startsWith("/a"));
+        PolicyMatcher m2 = predicateMatcher(ctx -> ctx.ip().startsWith("10."));
         PolicyMatcher all = PolicyCompiler.aggregate(List.of(m1, m2));
         assertThat(all.matches(new PolicyContext("10.0.0.1", "/a/1", Map.of()))).isTrue();
         assertThat(all.matches(new PolicyContext("10.0.0.1", "/b/1", Map.of()))).isFalse();
@@ -74,5 +78,47 @@ class PolicyCompilerMatchersTest {
 
         // attribute matcher requires value
         assertThrows(IllegalArgumentException.class, () -> PolicyCompiler.attributeMatcher("tier", Map.of()));
+    }
+
+    @Test
+    void headerGeoAndRouteGroupMatchers() {
+        PolicyMatcher header = PolicyCompiler.singleHeaderMatcher(Map.of(
+                "name", "X-Tier",
+                "anyOf", List.of("gold", "platinum")
+        ));
+        PolicyMatcher geo = PolicyCompiler.geoMatcher(Map.of("anyOf", List.of("US", "CA")));
+        PolicyMatcher groups = PolicyCompiler.routeGroupsMatcher(Map.of("anyOf", List.of("search", "admin")));
+
+        PolicyContext context = new PolicyContext(
+                "10.0.0.1",
+                "/search",
+                Map.of(),
+                Map.of("X-Tier", "gold"),
+                "US",
+                List.of("search", "reports")
+        );
+
+        assertThat(header.matches(context)).isTrue();
+        assertThat(geo.matches(context)).isTrue();
+        assertThat(groups.matches(context)).isTrue();
+
+        PolicyContext miss = new PolicyContext(
+                "10.0.0.1",
+                "/search",
+                Map.of(),
+                Map.of("X-Tier", "bronze"),
+                "FR",
+                List.of("finance")
+        );
+
+        assertThat(header.matches(miss)).isFalse();
+        assertThat(geo.matches(miss)).isFalse();
+        assertThat(groups.matches(miss)).isFalse();
+    }
+
+    private static PolicyMatcher predicateMatcher(Predicate<PolicyContext> predicate) {
+        return context -> predicate.test(context)
+                ? matched(empty())
+                : notMatched();
     }
 }

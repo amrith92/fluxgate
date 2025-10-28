@@ -32,7 +32,7 @@ class FluxGateLimiterTest {
         LimitPolicy policy = new LimitPolicy("ip", 5d, 5d, 60);
 
         // Act
-        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(42L, ignored -> policy, 0L);
+        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(42L, policy, 0L);
 
         // Assert
         assertThat(outcome.allowed()).isTrue();
@@ -61,11 +61,11 @@ class FluxGateLimiterTest {
         LimitPolicy policy = new LimitPolicy("ip", 2d, 2d, 60);
 
         // Act
-        limiter.check(99L, ignored -> policy, 0L);
-        limiter.check(99L, ignored -> policy, 0L);
-        limiter.check(99L, ignored -> policy, 0L);
-        limiter.check(99L, ignored -> policy, 0L);
-        FluxGateLimiter.RateLimitOutcome blocked = limiter.check(99L, ignored -> policy, 0L);
+        limiter.check(99L, policy, 0L);
+        limiter.check(99L, policy, 0L);
+        limiter.check(99L, policy, 0L);
+        limiter.check(99L, policy, 0L);
+        FluxGateLimiter.RateLimitOutcome blocked = limiter.check(99L, policy, 0L);
 
         // Assert
         assertThat(blocked.allowed()).isFalse();
@@ -91,11 +91,11 @@ class FluxGateLimiterTest {
         LimitPolicy policy = new LimitPolicy("ip", 3d, 3d, 60);
 
         for (int i = 0; i < 6; i++) {
-            FluxGateLimiter.RateLimitOutcome outcome = limiter.check(1L, ignored -> policy, 0L);
+            FluxGateLimiter.RateLimitOutcome outcome = limiter.check(1L, policy, 0L);
             assertThat(outcome.allowed()).as("request %s should be allowed", i + 1).isTrue();
         }
 
-        FluxGateLimiter.RateLimitOutcome seventh = limiter.check(1L, ignored -> policy, 0L);
+        FluxGateLimiter.RateLimitOutcome seventh = limiter.check(1L, policy, 0L);
 
         assertThat(seventh.allowed()).isFalse();
         assertThat(metrics.allowed.get()).isEqualTo(6);
@@ -111,8 +111,8 @@ class FluxGateLimiterTest {
                 .build();
         LimitPolicy policy = new LimitPolicy("client", 0.5d, 0d, 5);
 
-        FluxGateLimiter.RateLimitOutcome first = limiter.check(33L, ignored -> policy, 0L);
-        FluxGateLimiter.RateLimitOutcome second = limiter.check(33L, ignored -> policy, 0L);
+        FluxGateLimiter.RateLimitOutcome first = limiter.check(33L, policy, 0L);
+        FluxGateLimiter.RateLimitOutcome second = limiter.check(33L, policy, 0L);
 
         assertThat(first.allowed()).isTrue();
         assertThat(second.allowed()).isFalse();
@@ -133,7 +133,7 @@ class FluxGateLimiterTest {
                 .build();
         LimitPolicy policy = new LimitPolicy("ip", 0d, 0d, 60);
 
-        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(101L, ignored -> policy, 0L);
+        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(101L, policy, 0L);
 
         assertThat(outcome.allowed()).isFalse();
         assertThat(outcome.retryAfterNanos()).isPositive();
@@ -158,9 +158,9 @@ class FluxGateLimiterTest {
                 .build();
         LimitPolicy policy = new LimitPolicy("ip", 1d, 1d, 5);
 
-        FluxGateLimiter.RateLimitOutcome first = limiter.check(7L, ignored -> policy, 0L);
-        FluxGateLimiter.RateLimitOutcome second = limiter.check(7L, ignored -> policy, 0L);
-        FluxGateLimiter.RateLimitOutcome third = limiter.check(7L, ignored -> policy, 0L);
+        FluxGateLimiter.RateLimitOutcome first = limiter.check(7L, policy, 0L);
+        FluxGateLimiter.RateLimitOutcome second = limiter.check(7L, policy, 0L);
+        FluxGateLimiter.RateLimitOutcome third = limiter.check(7L, policy, 0L);
 
         assertThat(first.allowed()).isTrue();
         assertThat(second.allowed()).isTrue();
@@ -177,9 +177,9 @@ class FluxGateLimiterTest {
                 .build();
         LimitPolicy policy = new LimitPolicy("client", 1d, 1d, 5);
 
-        limiter.check(11L, ignored -> policy, 0L);
-        limiter.check(11L, ignored -> policy, 0L);
-        FluxGateLimiter.RateLimitOutcome blocked = limiter.check(11L, ignored -> policy, 0L);
+        limiter.check(11L, policy, 0L);
+        limiter.check(11L, policy, 0L);
+        FluxGateLimiter.RateLimitOutcome blocked = limiter.check(11L, policy, 0L);
 
         long expectedMinimum = Duration.ofSeconds(6).toNanos();
         assertThat(blocked.retryAfterNanos()).isGreaterThanOrEqualTo(expectedMinimum);
@@ -225,7 +225,7 @@ class FluxGateLimiterTest {
         FluxGateLimiter limiter = FluxGateLimiter.builder().build();
 
         // Act
-        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(1L, ignored -> null, 0L);
+        FluxGateLimiter.RateLimitOutcome outcome = limiter.check(1L, null, 0L);
 
         // Assert
         assertThat(outcome.allowed()).isTrue();

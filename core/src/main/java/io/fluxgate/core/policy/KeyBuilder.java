@@ -43,6 +43,18 @@ public final class KeyBuilder {
         return attribute("header:" + name, value);
     }
 
+    public KeyBuilder geo(String geo) {
+        return attribute("geo", geo);
+    }
+
+    public KeyBuilder routeGroup(String group) {
+        return attribute("routeGroup", group);
+    }
+
+    public KeyBuilder policy(String policyId) {
+        return attribute("policy", policyId);
+    }
+
     public long buildHash(String secret) {
         StringBuilder builder = new StringBuilder();
         attributes.forEach((k, v) -> builder.append(k).append('=').append(v).append('\n'));

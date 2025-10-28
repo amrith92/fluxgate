@@ -43,7 +43,8 @@ public final class Resilience4jAdapter {
     }
 
     private CachedOutcome evaluate(long keyHash) {
-        RateLimitOutcome outcome = limiter.check(keyHash, policyLookup, System.nanoTime());
+        LimitPolicy policy = policyLookup.apply(keyHash);
+        RateLimitOutcome outcome = limiter.check(keyHash, policy, System.nanoTime());
         CachedOutcome cached = new CachedOutcome(keyHash, outcome);
         cachedOutcome.set(cached);
         return cached;
