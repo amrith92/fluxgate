@@ -77,6 +77,48 @@ class FluxGateLimiterTest {
     }
 
     @Test
+    void longRotationsDoNotDoubleCountBurstTokens() {
+        TestMetrics metrics = new TestMetrics();
+        FluxGateLimiter limiter = FluxGateLimiter.builder()
+                .withMetrics(metrics)
+                .withStats(new FluxGateStats())
+                .withEstimator(new EwmaTrafficEstimator())
+                .withLimitScaler(new LimitScaler())
+                .withShardCapacity(4)
+                .withSketch(2, 16)
+                .withRotationPeriod(Duration.ofSeconds(2))
+                .build();
+        LimitPolicy policy = new LimitPolicy("ip", 3d, 3d, 60);
+
+        for (int i = 0; i < 6; i++) {
+            FluxGateLimiter.RateLimitOutcome outcome = limiter.check(1L, ignored -> policy, 0L);
+            assertThat(outcome.allowed()).as("request %s should be allowed", i + 1).isTrue();
+        }
+
+        FluxGateLimiter.RateLimitOutcome seventh = limiter.check(1L, ignored -> policy, 0L);
+
+        assertThat(seventh.allowed()).isFalse();
+        assertThat(metrics.allowed.get()).isEqualTo(6);
+        assertThat(metrics.blocked.get()).isEqualTo(1);
+    }
+
+    @Test
+    void subSecondRotationsGrantScaledLimitFloor() {
+        FluxGateLimiter limiter = FluxGateLimiter.builder()
+                .withEstimator(new EwmaTrafficEstimator())
+                .withLimitScaler(new LimitScaler())
+                .withRotationPeriod(Duration.ofMillis(100))
+                .build();
+        LimitPolicy policy = new LimitPolicy("client", 0.5d, 0d, 5);
+
+        FluxGateLimiter.RateLimitOutcome first = limiter.check(33L, ignored -> policy, 0L);
+        FluxGateLimiter.RateLimitOutcome second = limiter.check(33L, ignored -> policy, 0L);
+
+        assertThat(first.allowed()).isTrue();
+        assertThat(second.allowed()).isFalse();
+    }
+
+    @Test
     void zeroLimitPolicyBlocksImmediately() {
         TestMetrics metrics = new TestMetrics();
         FluxGateStats stats = new FluxGateStats();
