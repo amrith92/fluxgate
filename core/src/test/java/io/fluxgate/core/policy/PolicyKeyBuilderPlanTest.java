@@ -59,15 +59,23 @@ class PolicyKeyBuilderPlanTest {
                 .collect(Collectors.toMap(b -> b.policy().id(), CompiledPolicySet.PolicyBinding::keys));
 
         assertThat(keysByPolicy.get("header-groups")).containsExactlyInAnyOrder(
-                KeyBuilder.of().policy("header-groups").header("X-Tier", "gold").routeGroup("search").buildHash("secret"),
-                KeyBuilder.of().policy("header-groups").header("X-Tier", "gold").routeGroup("admin").buildHash("secret")
+                KeyBuilder.of()
+                        .policy("header-groups")
+                        .header("X-Tier", "gold")
+                        .routeGroup("search")
+                        .buildHash("secret"),
+                KeyBuilder.of()
+                        .policy("header-groups")
+                        .header("X-Tier", "gold")
+                        .routeGroup("admin")
+                        .buildHash("secret")
         );
 
         assertThat(keysByPolicy.get("geo-attribute")).containsExactly(
                 KeyBuilder.of()
                         .policy("geo-attribute")
-                        .geo("US")
                         .attribute("account", "a1")
+                        .geo("US")
                         .buildHash("secret")
         );
     }
