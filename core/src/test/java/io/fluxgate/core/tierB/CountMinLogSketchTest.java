@@ -1,9 +1,9 @@
 package io.fluxgate.core.tierB;
 
-import java.time.Duration;
-import java.lang.reflect.Field;
-
 import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Field;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
