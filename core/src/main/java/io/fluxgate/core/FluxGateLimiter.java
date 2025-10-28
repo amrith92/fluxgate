@@ -153,8 +153,20 @@ public final class FluxGateLimiter {
 
     private long computeAllowedBudget(double scaledLimit, LimitPolicy policy) {
         double rotationSeconds = rotationPeriodNanos / 1_000_000_000d;
-        double baseBudget = Math.max(0d, scaledLimit) * rotationSeconds;
-        double burstBudget = Math.max(0d, policy.burstTokens());
+        double sanitizedLimit = Math.max(0d, scaledLimit);
+        double baseBudget = sanitizedLimit * rotationSeconds;
+        if (rotationSeconds < 1d) {
+            baseBudget = Math.max(baseBudget, sanitizedLimit);
+        }
+
+        double burstBudget;
+        double burstTokens = Math.max(0d, policy.burstTokens());
+        if (rotationSeconds >= 1d) {
+            burstBudget = Math.max(0d, burstTokens - sanitizedLimit);
+        } else {
+            burstBudget = burstTokens;
+        }
+
         long budget = (long) Math.ceil(baseBudget + burstBudget);
         if (budget <= 0L) {
             return 0L;

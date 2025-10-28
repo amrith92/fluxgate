@@ -6,6 +6,9 @@ public final class LimitScaler {
 
     public double scale(double globalLimit, EwmaTrafficEstimator.AdaptiveState state) {
         Objects.requireNonNull(state, "state");
+        if (globalLimit <= 0d) {
+            return 0d;
+        }
         double share = state.share();
         if (share <= 0d) {
             return Math.max(1d, globalLimit);
@@ -17,6 +20,9 @@ public final class LimitScaler {
      * Legacy helper for callers that still rely on the scalar share factor.
      */
     public double scale(double globalLimit, double instanceShare) {
+        if (globalLimit <= 0d) {
+            return 0d;
+        }
         if (instanceShare <= 0d) {
             return Math.max(1d, globalLimit);
         }
