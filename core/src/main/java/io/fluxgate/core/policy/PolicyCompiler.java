@@ -420,6 +420,13 @@ public final class PolicyCompiler {
             return PolicyMatchResult.notMatched();
         }
         LinkedHashSet<String> matched = new LinkedHashSet<>(groups);
+        if (!noneValues.isEmpty()) {
+            for (String value : noneValues) {
+                if (matched.contains(value)) {
+                    return PolicyMatchResult.notMatched();
+                }
+            }
+        }
         if (equalsValue != null) {
             if (!matched.contains(equalsValue)) {
                 return PolicyMatchResult.notMatched();
@@ -438,11 +445,6 @@ public final class PolicyCompiler {
                 return PolicyMatchResult.notMatched();
             }
             matched = intersection;
-        }
-        if (!noneValues.isEmpty()) {
-            for (String value : noneValues) {
-                matched.remove(value);
-            }
         }
         if (matched.isEmpty()) {
             return PolicyMatchResult.notMatched();
