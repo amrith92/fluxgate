@@ -41,9 +41,13 @@ class HybridHotKeyCacheTest {
         HybridHotKeyCache<Integer, String> cache = new HybridHotKeyCache<>(4);
 
         cache.getOrCompute(1, () -> "one");
-        cache.getOrCompute(1, () -> { throw new AssertionError("already cached"); });
+        cache.getOrCompute(1, () -> {
+            throw new AssertionError("already cached");
+        });
         cache.getOrCompute(2, () -> "two");
-        cache.getOrCompute(2, () -> { throw new AssertionError("already cached"); });
+        cache.getOrCompute(2, () -> {
+            throw new AssertionError("already cached");
+        });
 
         for (int i = 0; i < 6; i++) {
             cache.getIfPresent(1);
