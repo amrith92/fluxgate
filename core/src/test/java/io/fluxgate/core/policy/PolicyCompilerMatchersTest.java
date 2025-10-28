@@ -4,7 +4,11 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
+import static io.fluxgate.core.policy.KeyContext.empty;
+import static io.fluxgate.core.policy.PolicyMatchResult.matched;
+import static io.fluxgate.core.policy.PolicyMatchResult.notMatched;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -12,8 +16,8 @@ class PolicyCompilerMatchersTest {
 
     @Test
     void aggregateAllAnyNotMatchers() {
-        PolicyMatcher m1 = ctx -> ctx.route().startsWith("/a");
-        PolicyMatcher m2 = ctx -> ctx.ip().startsWith("10.");
+        PolicyMatcher m1 = predicateMatcher(ctx -> ctx.route().startsWith("/a"));
+        PolicyMatcher m2 = predicateMatcher(ctx -> ctx.ip().startsWith("10."));
         PolicyMatcher all = PolicyCompiler.aggregate(List.of(m1, m2));
         assertThat(all.matches(new PolicyContext("10.0.0.1", "/a/1", Map.of()))).isTrue();
         assertThat(all.matches(new PolicyContext("10.0.0.1", "/b/1", Map.of()))).isFalse();
@@ -110,5 +114,11 @@ class PolicyCompilerMatchersTest {
         assertThat(header.matches(miss)).isFalse();
         assertThat(geo.matches(miss)).isFalse();
         assertThat(groups.matches(miss)).isFalse();
+    }
+
+    private static PolicyMatcher predicateMatcher(Predicate<PolicyContext> predicate) {
+        return context -> predicate.test(context)
+                ? matched(empty())
+                : notMatched();
     }
 }
