@@ -34,6 +34,15 @@ public final class HeavyKeeper {
         }
     }
 
+    public int estimate(long key) {
+        int index = (int) (Math.floorMod(Long.hashCode(key), entries.length));
+        Entry entry = entries[index];
+        if (entry == null) {
+            return 0;
+        }
+        return entry.key == key ? entry.count : 0;
+    }
+
     public Entry[] topK() {
         PriorityQueue<Entry> queue = new PriorityQueue<>(Comparator.comparingInt(e -> -e.count));
         Arrays.stream(entries).filter(e -> e != null && e.count > 0).forEach(queue::offer);

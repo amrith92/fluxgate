@@ -36,6 +36,7 @@ public final class FluxGateLimiter {
     private final LimitScaler limitScaler;
     private final Map<String, LimitPolicy> policies;
     private final SliceRotator rotator;
+    private final long rotationPeriodNanos;
 
     public FluxGateLimiter(Builder builder) {
         this.hotCache = new HybridHotKeyCache<>(builder.shardCapacity);
@@ -48,6 +49,7 @@ public final class FluxGateLimiter {
         this.policies = new ConcurrentHashMap<>();
         builder.policies.forEach(policy -> policies.put(policy.id(), policy));
         this.rotator = new SliceRotator(sketch, builder.rotationPeriod);
+        this.rotationPeriodNanos = builder.rotationPeriod.toNanos();
     }
 
     public RateLimitOutcome check(long keyHash, Function<Long, LimitPolicy> policySupplier, long nowNanos) {
@@ -57,27 +59,15 @@ public final class FluxGateLimiter {
             return RateLimitOutcome.allow();
         }
 
+        rotator.rotateIfNeeded(nowNanos);
         EwmaTrafficEstimator.AdaptiveState adaptiveState = estimator.observe(nowNanos);
         double scaledLimit = limitScaler.scale(policy.limitPerSecond(), adaptiveState);
-        GcraLimiter limiter = hotCache.getOrCompute(keyHash,
-                () -> new GcraLimiter(Duration.ofSeconds(1).toNanos(), scaledLimit, policy.burstTokens()));
-
-        GcraLimiter.Outcome outcome = limiter.tryAcquire(nowNanos);
-        if (outcome.allowed()) {
-            metrics.recordAllowed();
-            stats.onAllowed();
-            EwmaTrafficEstimator.AdaptiveState updatedState = estimator.recordLocalPermits(1L, nowNanos);
-            publishAdaptiveState(updatedState);
-            sketch.increment(keyHash, nowNanos);
-            heavyKeeper.offer(keyHash);
-            rotator.rotateIfNeeded(nowNanos);
-            return RateLimitOutcome.allow();
+        GcraLimiter existingLimiter = hotCache.getIfPresent(keyHash);
+        if (existingLimiter != null) {
+            return handleTierA(keyHash, nowNanos, adaptiveState, existingLimiter);
         }
 
-        metrics.recordBlocked();
-        stats.onBlocked();
-        publishAdaptiveState(adaptiveState);
-        return RateLimitOutcome.blocked(outcome.retryAfterNanos());
+        return handleTierB(keyHash, policy, nowNanos, adaptiveState, scaledLimit);
     }
 
     public void registerPolicy(LimitPolicy policy) {
@@ -108,6 +98,112 @@ public final class FluxGateLimiter {
     private void publishAdaptiveState(EwmaTrafficEstimator.AdaptiveState state) {
         metrics.recordAdaptiveState(state);
         stats.onAdaptiveUpdate(state);
+    }
+
+    private RateLimitOutcome handleTierA(long keyHash,
+                                         long nowNanos,
+                                         EwmaTrafficEstimator.AdaptiveState adaptiveState,
+                                         GcraLimiter limiter) {
+        GcraLimiter.Outcome outcome = limiter.tryAcquire(nowNanos);
+        if (outcome.allowed()) {
+            onAllowed(keyHash, nowNanos);
+            return RateLimitOutcome.allow();
+        }
+
+        metrics.recordBlocked();
+        stats.onBlocked();
+        publishAdaptiveState(adaptiveState);
+        return RateLimitOutcome.blocked(outcome.retryAfterNanos());
+    }
+
+    private RateLimitOutcome handleTierB(long keyHash,
+                                         LimitPolicy policy,
+                                         long nowNanos,
+                                         EwmaTrafficEstimator.AdaptiveState adaptiveState,
+                                         double scaledLimit) {
+        long allowedBudget = computeAllowedBudget(scaledLimit, policy);
+        long currentEstimate = sketch.estimate(keyHash);
+        long projected = safeIncrement(currentEstimate);
+        if (projected > allowedBudget) {
+            metrics.recordBlocked();
+            stats.onBlocked();
+            publishAdaptiveState(adaptiveState);
+            long retryAfter = computeSketchRetryAfterNanos(scaledLimit, policy);
+            return RateLimitOutcome.blocked(retryAfter);
+        }
+
+        onAllowed(keyHash, nowNanos);
+        long promotionThresholdCount = projected;
+        if (shouldPromote(keyHash, scaledLimit, policy, allowedBudget, promotionThresholdCount)) {
+            GcraLimiter limiter = hotCache.getOrCompute(keyHash,
+                    () -> new GcraLimiter(Duration.ofSeconds(1).toNanos(), scaledLimit, policy.burstTokens()));
+            limiter.tryAcquire(nowNanos);
+        }
+        return RateLimitOutcome.allow();
+    }
+
+    private void onAllowed(long keyHash, long nowNanos) {
+        metrics.recordAllowed();
+        stats.onAllowed();
+        EwmaTrafficEstimator.AdaptiveState updatedState = estimator.recordLocalPermits(1L, nowNanos);
+        publishAdaptiveState(updatedState);
+        sketch.increment(keyHash, nowNanos);
+        heavyKeeper.offer(keyHash);
+    }
+
+    private long computeAllowedBudget(double scaledLimit, LimitPolicy policy) {
+        double rotationSeconds = rotationPeriodNanos / 1_000_000_000d;
+        double sanitizedLimit = Math.max(0d, scaledLimit);
+        double baseBudget = sanitizedLimit * rotationSeconds;
+        if (rotationSeconds < 1d) {
+            baseBudget = Math.max(baseBudget, sanitizedLimit);
+        }
+
+        double burstBudget;
+        double burstTokens = Math.max(0d, policy.burstTokens());
+        if (rotationSeconds >= 1d) {
+            burstBudget = Math.max(0d, burstTokens - sanitizedLimit);
+        } else {
+            burstBudget = burstTokens;
+        }
+
+        long budget = (long) Math.ceil(baseBudget + burstBudget);
+        if (budget <= 0L) {
+            return 0L;
+        }
+        return Math.max(1L, budget);
+    }
+
+    private long computeSketchRetryAfterNanos(double scaledLimit, LimitPolicy policy) {
+        double windowSeconds = Math.max(1d, policy.windowSeconds());
+        double permitsPerSecond = Math.max(1d, scaledLimit);
+        double burstSeconds = Math.max(0d, policy.burstTokens()) / permitsPerSecond;
+        double totalSeconds = windowSeconds + burstSeconds;
+        double nanos = totalSeconds * 1_000_000_000d;
+        if (nanos >= Long.MAX_VALUE) {
+            return Long.MAX_VALUE;
+        }
+        return Math.max(1L, (long) Math.ceil(nanos));
+    }
+
+    private long safeIncrement(long value) {
+        return value == Long.MAX_VALUE ? Long.MAX_VALUE : value + 1;
+    }
+
+    private boolean shouldPromote(long keyHash,
+                                  double scaledLimit,
+                                  LimitPolicy policy,
+                                  long allowedBudget,
+                                  long observedCount) {
+        int heavyEstimate = heavyKeeper.estimate(keyHash);
+        long burstFloor = (long) Math.ceil(Math.max(0d, policy.burstTokens()));
+        long limitFloor = (long) Math.ceil(Math.max(0d, scaledLimit));
+        long promotionThreshold = Math.max(10L, Math.max(burstFloor, limitFloor));
+        if (heavyEstimate < promotionThreshold) {
+            return false;
+        }
+        long requiredCount = Math.min(allowedBudget, promotionThreshold);
+        return observedCount >= requiredCount;
     }
 
     /**
