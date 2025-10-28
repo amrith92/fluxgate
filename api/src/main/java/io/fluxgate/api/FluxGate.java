@@ -45,7 +45,13 @@ public final class FluxGate {
 
     public RateLimitResult check(RequestContext ctx) {
         Map<String, String> attributes = ctx.attributes();
-        PolicyContext context = new PolicyContext(ctx.ip(), ctx.route(), attributes, ctx.headers(), ctx.geo(), ctx.routeGroups());
+        PolicyContext context = new PolicyContext(
+                ctx.ip(),
+                ctx.route(),
+                attributes,
+                ctx.headers(),
+                ctx.geo(),
+                ctx.routeGroups());
         List<CompiledPolicySet.PolicyBinding> bindings = policySet.bindings(context, secret);
         if (bindings.isEmpty()) {
             return RateLimitResult.allowed();
@@ -70,7 +76,13 @@ public final class FluxGate {
     }
 
     public List<PolicyDecision> evaluatePolicies(RequestContext ctx) {
-        PolicyContext context = new PolicyContext(ctx.ip(), ctx.route(), ctx.attributes(), ctx.headers(), ctx.geo(), ctx.routeGroups());
+        PolicyContext context = new PolicyContext(
+                ctx.ip(),
+                ctx.route(),
+                ctx.attributes(),
+                ctx.headers(),
+                ctx.geo(),
+                ctx.routeGroups());
         return policySet.evaluate(context);
     }
 
