@@ -2,6 +2,7 @@ package io.fluxgate.core.tierB;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -9,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SliceRotatorTest {
 
     @Test
-    void rotateIfNeededResetsSketchWhenThresholdReached() {
+    void rotateIfNeededResetsSketchWhenThresholdReached() throws Exception {
         // Arrange
         Duration rotation = Duration.ofMillis(5);
         CountMinLogSketch sketch = new CountMinLogSketch(2, 16, rotation);
@@ -23,6 +24,11 @@ class SliceRotatorTest {
 
         // Assert
         assertThat(estimate).isZero();
+
+        long[][] epochs = extractEpochs(sketch);
+        for (long[] row : epochs) {
+            assertThat(row).containsOnly(0L);
+        }
     }
 
     @Test
@@ -40,5 +46,11 @@ class SliceRotatorTest {
 
         // Assert
         assertThat(estimate).isOne();
+    }
+
+    private static long[][] extractEpochs(CountMinLogSketch sketch) throws Exception {
+        Field field = CountMinLogSketch.class.getDeclaredField("epochs");
+        field.setAccessible(true);
+        return (long[][]) field.get(sketch);
     }
 }

@@ -24,4 +24,15 @@ class LimitScalerTest {
 
         assertThat(limit).isEqualTo(100d);
     }
+
+    @Test
+    void scaleReturnsZeroWhenGlobalLimitZero() {
+        LimitScaler scaler = new LimitScaler();
+        EwmaTrafficEstimator.AdaptiveState state = new EwmaTrafficEstimator.AdaptiveState(1d, 1d, 0L);
+
+        double limit = scaler.scale(0d, state);
+
+        assertThat(limit).isZero();
+        assertThat(scaler.scale(0d, 0d)).isZero();
+    }
 }
